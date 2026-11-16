@@ -1,17 +1,17 @@
-context("Test ordered.clusters")
-
-test_that("Detects non-contiguous clusters", {
-    x <- c(1, 1, 1, 2, 2, 3, 4, 1, 5, 5, 5)
-    expect_false(ordered.clusters(x))
+test_that("ordered.clusters is TRUE when equal ids are contiguous", {
+  expect_true(ordered.clusters(c(1, 1, 1, 2, 2, 3)))
+  expect_true(ordered.clusters(c(3, 3, 1, 2, 2)))
+  expect_true(ordered.clusters(c("a", "a", "b")))
+  expect_true(ordered.clusters(factor(c("b", "b", "a"))))
 })
 
-test_that("Detects contiguous clusters after sorting", {
-    x <- c(1, 1, 1, 2, 2, 3, 4, 1, 5, 5, 5)
-    expect_true(ordered.clusters(sort(x)))
-    expect_true(ordered.clusters(x[order(x)]))
+test_that("ordered.clusters is FALSE when an id reappears later", {
+  expect_false(ordered.clusters(c(1, 2, 1)))
+  expect_false(ordered.clusters(c(1, 1, 1, 2, 2, 3, 4, 1, 5, 5, 5)))
 })
 
-test_that("A vector with no duplicates is trivially contiguous", {
-    expect_true(ordered.clusters(c(1, 2, 3)))
-    expect_true(ordered.clusters(1))
+test_that("ordered.clusters is TRUE for vectors without duplicates", {
+  expect_true(ordered.clusters(c(1, 2, 3)))
+  expect_true(ordered.clusters(1))
+  expect_true(ordered.clusters(numeric(0)))
 })

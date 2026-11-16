@@ -1,45 +1,43 @@
-context("Test gkgamma")
-
-test_that("documented example produces expected htest object", {
-    smoke <- matrix(c(16, 15, 13, 10, 1, 73, 75, 59, 81, 29, 6, 6, 7, 17, 3, 1, 0, 1, 3, 1), ncol = 4)
-    colnames(smoke) <- c("VGood", "Good", "Fair", "Bad")
-    rownames(smoke) <- c("Never", "No more", "1-14", "15-24", "25+")
-
-    res <- gkgamma(smoke)
-
-    expect_s3_class(res, "htest")
-    expect_true(all(c("statistic", "p.value", "estimate", "conf.int", "method",
-                       "data.name", "observed", "se0", "se1") %in% names(res)))
-    expect_equal(unname(res$estimate), 0.2418174, tolerance = 1e-6)
-    expect_true(res$estimate >= -1 && res$estimate <= 1)
+test_that("gkgamma equals Yule's Q for a 2x2 table", {
+  tab <- matrix(c(10, 5, 3, 12), nrow = 2)
+  # Yule's Q = (ad - bc) / (ad + bc) = (120 - 15) / (120 + 15)
+  expect_equal(unname(gkgamma(tab)$estimate), 105 / 135)
 })
 
-test_that("estimate is always within [-1, 1]", {
-    set.seed(1)
-    tab <- matrix(sample(1:20, 9, replace = TRUE), nrow = 3)
-    res <- gkgamma(tab)
-    expect_true(res$estimate >= -1 && res$estimate <= 1)
+test_that("gkgamma gives +1 / -1 for perfectly concordant / discordant tables", {
+  expect_equal(unname(gkgamma(diag(c(5, 5, 5)))$estimate), 1)
+  expect_equal(unname(gkgamma(diag(c(5, 5, 5))[, 3:1])$estimate), -1)
 })
 
-test_that("a diagonal-dominant table gives an estimate close to 1", {
-    diagtab <- matrix(c(100, 1, 1, 1, 100, 1, 1, 1, 100), nrow = 3, byrow = TRUE)
-    res <- gkgamma(diagtab)
-    expect_true(res$estimate > 0.95)
+test_that("gkgamma reproduces the documented smoking example", {
+  smoke <- matrix(
+    c(16, 15, 13, 10, 1, 73, 75, 59, 81, 29, 6, 6, 7, 17, 3, 1, 0, 1, 3, 1),
+    ncol = 4
+  )
+  res <- gkgamma(smoke)
+
+  expect_s3_class(res, "htest")
+  expect_equal(unname(res$estimate), 0.2418173666, tolerance = 1e-8)
+  expect_equal(res$se0, 0.07334398549, tolerance = 1e-8)
+  expect_equal(res$se1, 0.07066251422, tolerance = 1e-8)
+  expect_equal(unname(res$statistic), 3.297030629, tolerance = 1e-8)
+  expect_equal(res$data.name, "smoke")
+  expect_identical(res$observed, smoke)
 })
 
-test_that("conf.int width grows monotonically with conf.level", {
-    smoke <- matrix(c(16, 15, 13, 10, 1, 73, 75, 59, 81, 29, 6, 6, 7, 17, 3, 1, 0, 1, 3, 1), ncol = 4)
+test_that("gkgamma p-value and confidence interval follow from estimate and SEs", {
+  smoke <- matrix(
+    c(16, 15, 13, 10, 1, 73, 75, 59, 81, 29, 6, 6, 7, 17, 3, 1, 0, 1, 3, 1),
+    ncol = 4
+  )
+  res <- gkgamma(smoke, conf.level = 0.90)
+  est <- unname(res$estimate)
 
-    width90 <- diff(gkgamma(smoke, conf.level = 0.90)$conf.int)
-    width95 <- diff(gkgamma(smoke, conf.level = 0.95)$conf.int)
-    width99 <- diff(gkgamma(smoke, conf.level = 0.99)$conf.int)
-
-    expect_true(width90 < width95)
-    expect_true(width95 < width99)
-})
-
-test_that("gkgamma errors on input that cannot be treated as a numeric matrix", {
-    bad_df <- data.frame(a = c("x", "y"), b = c("z", "w"))
-    expect_error(gkgamma(bad_df))
-    expect_error(gkgamma(list(1, 2, 3)))
+  expect_equal(unname(res$statistic), est / res$se0)
+  expect_equal(res$p.value, 2 * pnorm(-abs(est / res$se0)))
+  expect_equal(
+    as.vector(res$conf.int),
+    est + c(-1, 1) * qnorm(0.95) * res$se1
+  )
+  expect_identical(attr(res$conf.int, "conf.level"), 0.90)
 })

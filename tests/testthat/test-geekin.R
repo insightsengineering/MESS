@@ -1,87 +1,94 @@
-context("Test geekin / print.geekin")
-
-suppressPackageStartupMessages(library(geepack))
-
-## ---- Shared fixture --------------------------------------------------
-set.seed(1)
-n_clusters <- 20
-cluster_size <- 4
-id <- rep(1:n_clusters, each = cluster_size)
-age <- rep(1:cluster_size, times = n_clusters)
-x1 <- rnorm(n_clusters * cluster_size)
-u <- rep(rnorm(n_clusters, sd = 0.5), each = cluster_size)  # cluster-level random effect
-p <- plogis(-0.5 + 0.8 * x1 + 0.3 * age + u)
-y <- rbinom(length(p), 1, p)
-dat <- data.frame(id = id, y = y, x1 = x1, age = age)
-
-fit_geeglm <- geepack::geeglm(y ~ x1 + age, id = id, data = dat, family = binomial, corstr = "exchangeable")
-
-# Block-diagonal "exchangeable-equivalent" correlation basis: one block of
-# all-1s per cluster (off-diagonal elements scaled by a single alpha via
-# geekin's userdefined zcor mechanism is mathematically equivalent to a
-# standard exchangeable working correlation).
-V <- matrix(0, nrow(dat), nrow(dat))
-for (cl in unique(id)) {
-    ix <- which(id == cl)
-    V[ix, ix] <- 1
+# A block-diagonal matrix of ones (one block per cluster) gives a single
+# correlation parameter shared by all within-cluster pairs, i.e. geekin()
+# reproduces geeglm() with an exchangeable working correlation.
+exchangeable_varlist <- function(n_clusters = 20, cluster_size = 4) {
+  kronecker(diag(n_clusters), matrix(1, cluster_size, cluster_size))
 }
-diag(V) <- 1
 
-# NOTE (fixture deviation): geekin()'s `family` argument defaults to
-# gaussian. The shared fixture's `y` is binary, so family = binomial must be
-# supplied explicitly -- otherwise geekin() silently fits an identity-link
-# (linear probability) model to the 0/1 outcome, which produces coefficients
-# wildly different from fit_geeglm's logistic fit (e.g. opposite-signed
-# intercept), rather than the "reasonably close" coefficients expected when
-# comparing the same family/link with different correlation-structure
-# parameterizations.
-fit_geekin <- geekin(y ~ x1 + age, id = id, data = dat, family = binomial, varlist = list(V))
+test_that("geekin with a block-of-ones varlist equals an exchangeable geeglm fit", {
+  dat <- make_gee_data()
+  V <- exchangeable_varlist()
 
-test_that("geekin returns an object of class geekin that also inherits geeglm", {
-    expect_s3_class(fit_geekin, "geekin")
-    expect_s3_class(fit_geekin, "geeglm")
+  fit <- geekin(y ~ x1 + age, id = dat$id, data = dat, family = binomial, varlist = list(V))
+  ref <- geepack::geeglm(y ~ x1 + age, id = id, data = dat, family = binomial, corstr = "exchangeable")
+
+  expect_s3_class(fit, c("geekin", "geeglm"))
+  expect_equal(coef(fit), coef(ref))
+  expect_equal(unname(fit$geese$alpha), unname(ref$geese$alpha))
+  expect_identical(fit$geese$model$corstr, "userdefined")
 })
 
-test_that("coef(fit_geekin) is a named numeric vector close to coef(fit_geeglm)", {
-    cf <- coef(fit_geekin)
-    expect_type(cf, "double")
-    expect_length(cf, 3)
-    expect_equal(names(cf), c("(Intercept)", "x1", "age"))
-    # The all-1s block-diagonal varlist (userdefined zcor) reproduces an
-    # exchangeable working correlation, so the mean-model coefficients
-    # should closely match the plain exchangeable geeglm fit.
-    expect_equal(unname(cf), unname(coef(fit_geeglm)), tolerance = 1e-2)
+test_that("geekin accepts a single matrix as varlist", {
+  dat <- make_gee_data()
+  V <- exchangeable_varlist()
+
+  fit_list <- geekin(y ~ x1 + age, id = dat$id, data = dat, family = binomial, varlist = list(V))
+  fit_matrix <- geekin(y ~ x1 + age, id = dat$id, data = dat, family = binomial, varlist = V)
+  expect_equal(coef(fit_matrix), coef(fit_list))
 })
 
-test_that("varlist accepts a bare matrix identically to a single-element list", {
-    fit_geekin_mat <- geekin(y ~ x1 + age, id = id, data = dat, family = binomial, varlist = V)
-    expect_equal(coef(fit_geekin_mat), coef(fit_geekin))
+test_that("geekin drops observations with missing values like geeglm", {
+  dat <- make_gee_data()
+  dat$x1[c(3, 10)] <- NA
+  V <- exchangeable_varlist()
+
+  fit <- geekin(y ~ x1 + age, id = dat$id, data = dat, family = binomial, varlist = list(V))
+  ref <- geepack::geeglm(y ~ x1 + age, id = id, data = na.omit(dat), family = binomial,
+                         corstr = "exchangeable")
+
+  expect_equal(coef(fit), coef(ref))
+  expect_identical(as.vector(fit$na.action), c(3L, 10L))
 })
 
-test_that("geekin errors when varlist is neither a matrix nor a list", {
-    expect_error(geekin(y ~ x1 + age, id = id, data = dat, family = binomial, varlist = 1:5),
-                 "varlist must be a list")
-    expect_error(geekin(y ~ x1 + age, id = id, data = dat, family = binomial, varlist = "foo"),
-                 "varlist must be a list")
+test_that("geekin validates varlist and cluster ordering", {
+  dat <- make_gee_data()
+  V <- exchangeable_varlist()
+
+  expect_error(
+    geekin(y ~ x1 + age, id = dat$id, data = dat, family = binomial, varlist = "V"),
+    "varlist must be a list"
+  )
+
+  shuffled <- dat[order(dat$age), ]
+  expect_error(
+    geekin(y ~ x1 + age, id = shuffled$id, data = shuffled, family = binomial, varlist = list(V)),
+    "contiguous blocks"
+  )
 })
 
-test_that("geekin errors when the clusters are not contiguous blocks", {
-    # Interleave observations from different clusters by cluster-position so
-    # that `id` is no longer made up of contiguous runs, while keeping
-    # y/x1/age aligned with their original id for each row.
-    idx <- order(rep(seq_len(cluster_size), times = n_clusters))
-    dat_shuffled <- dat[idx, ]
-    id_shuffled <- dat_shuffled$id
-    expect_false(ordered.clusters(id_shuffled))
+test_that("print.geekin shows the call, coefficients and correlation parameters", {
+  dat <- make_gee_data()
+  V <- exchangeable_varlist()
+  fit <- geekin(y ~ x1 + age, id = dat$id, data = dat, family = binomial, varlist = list(V))
 
-    expect_error(
-        geekin(y ~ x1 + age, id = id_shuffled, data = dat_shuffled, family = binomial, varlist = list(V)),
-        "contiguous blocks"
-    )
+  out <- capture.output(res <- print(fit))
+  expect_identical(res, fit)
+  expect_true("Call:" %in% out)
+  expect_true("Coefficients:" %in% out)
+  expect_true("Estimated Correlation Parameters:" %in% out)
+  expect_match(out, "Degrees of Freedom: 80 Total", fixed = TRUE, all = FALSE)
+  expect_match(out, "Number of clusters:   20   Maximum cluster size: 4", fixed = TRUE, all = FALSE)
 })
 
-test_that("print.geekin prints a Call: and Coefficients: section", {
-    out <- capture.output(print(fit_geekin))
-    expect_true(any(grepl("Call:", out, fixed = TRUE)))
-    expect_true(any(grepl("Coefficients:", out, fixed = TRUE)))
+test_that("print.geekin does not change the global digits option", {
+  skip_known_bug("B36")
+  dat <- make_gee_data()
+  V <- exchangeable_varlist()
+  fit <- geekin(y ~ x1 + age, id = dat$id, data = dat, family = binomial, varlist = list(V))
+
+  withr::local_options(digits = 7)
+  capture.output(print(fit, digits = 3))
+  expect_identical(getOption("digits"), 7L)
+})
+
+test_that("geekin works when geepack is not attached", {
+  skip_known_bug("B35")
+  env <- new.env(parent = globalenv())
+  env$dat <- make_gee_data()
+  env$V <- exchangeable_varlist()
+
+  expect_no_error(evalq(
+    MESS::geekin(y ~ x1 + age, id = dat$id, data = dat, family = binomial, varlist = list(V)),
+    env
+  ))
 })

@@ -1,18 +1,13 @@
-context("Test categorize")
-
-test_that("Bare variable names produce a table with correct dimensions", {
-    result <- esoph |> categorize(alcgp, agegp)
-    expect_s3_class(result, "table")
-    expect_equal(dim(result), c(4, 6))
+test_that("categorize() with bare names equals table()", {
+  expect_equal(categorize(esoph, alcgp, agegp), table(esoph$alcgp, esoph$agegp), ignore_attr = TRUE)
+  expect_equal(categorize(esoph, alcgp), table(esoph$alcgp), ignore_attr = TRUE)
 })
 
-test_that("Formula interface produces an xtabs object equivalent to the table form", {
-    result_table <- esoph |> categorize(alcgp, agegp)
-    result_formula <- esoph |> categorize(~ alcgp + agegp)
-    expect_s3_class(result_formula, "xtabs")
-    expect_equal(as.numeric(result_formula), as.numeric(result_table))
+test_that("categorize() with a formula equals xtabs()", {
+  expect_equal(categorize(esoph, ~ alcgp + agegp), xtabs(~ alcgp + agegp, data = esoph), ignore_attr = "call")
+  expect_equal(categorize(esoph, ncases ~ alcgp), xtabs(ncases ~ alcgp, data = esoph), ignore_attr = "call")
 })
 
-test_that("Referencing an undefined variable raises an error", {
-    expect_error(esoph |> categorize(nonexistentvariable))
+test_that("categorize() errors for an unknown variable", {
+  expect_error(categorize(esoph, nonexistentvariable), "not found")
 })

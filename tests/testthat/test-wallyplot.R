@@ -1,50 +1,55 @@
-test_that("wallyplot.default works for a vector x and y with hide=TRUE", {
-  pdf(tempfile())
-  on.exit(dev.off())
-  set.seed(1)
-  expect_no_error(wallyplot(1:20, rnorm(20)))
+# All tests use hide = FALSE: with hide = TRUE the plot waits for <Enter>
+# via readline(), and the original data is always drawn in the first panel.
+
+# Panel function that plots and records the y values it is asked to draw
+recording_panel <- function(env) {
+  force(env)
+  function(x, y, ...) {
+    env$calls <- c(env$calls, list(y))
+    plot(x, y, ...)
+  }
+}
+
+test_that("wallyplot draws 9 panels with the original data first and returns invisible NULL", {
+  withr::local_pdf(NULL)
+  withr::local_seed(1)
+  rec <- new.env()
+  y <- rnorm(20)
+
+  expect_invisible(res <- wallyplot(1:20, y, FUN = recording_panel(rec), hide = FALSE))
+  expect_null(res)
+  expect_length(rec$calls, 9)
+  expect_equal(rec$calls[[1]], y)
 })
 
-test_that("wallyplot.default returns invisible NULL", {
-  pdf(tempfile())
-  on.exit(dev.off())
-  set.seed(1)
-  result <- wallyplot(1:20, rnorm(20))
-  expect_null(result)
+test_that("a 9-column matrix of y values is plotted as given", {
+  withr::local_pdf(NULL)
+  rec <- new.env()
+  y <- matrix(1:90, ncol = 9)
+
+  wallyplot(1:10, y, FUN = recording_panel(rec), hide = FALSE)
+  expect_equal(rec$calls, lapply(1:9, function(j) y[, j]))
 })
 
-test_that("wallyplot.default works with hide=FALSE", {
-  pdf(tempfile())
-  on.exit(dev.off())
-  set.seed(2)
-  expect_no_error(wallyplot(1:20, rnorm(20), hide = FALSE))
+test_that("the default residualplot panel function draws without error", {
+  withr::local_pdf(NULL)
+  withr::local_seed(2)
+  expect_null(wallyplot(1:20, rnorm(20), hide = FALSE))
 })
 
-test_that("wallyplot.lm works for an lm object", {
-  pdf(tempfile())
-  on.exit(dev.off())
-  set.seed(3)
-  model <- lm(Volume ~ Girth + Height, data = trees)
-  expect_no_error(wallyplot(model))
+test_that("wallyplot for an lm fit shows the standardized residuals first", {
+  withr::local_pdf(NULL)
+  withr::local_seed(3)
+  rec <- new.env()
+  fit <- lm(Volume ~ Girth + Height, data = trees)
+
+  expect_null(wallyplot(fit, FUN = recording_panel(rec), hide = FALSE))
+  expect_length(rec$calls, 9)
+  expect_equal(rec$calls[[1]], rstandard(fit))
 })
 
-test_that("wallyplot.lm returns invisible NULL", {
-  pdf(tempfile())
-  on.exit(dev.off())
-  set.seed(3)
-  model <- lm(Volume ~ Girth + Height, data = trees)
-  result <- wallyplot(model)
-  expect_null(result)
-})
-
-test_that("wallyplot errors when y matrix does not have 9 columns", {
-  pdf(tempfile())
-  on.exit(dev.off())
-  expect_error(wallyplot(1:20, matrix(rnorm(20 * 5), ncol = 5)))
-})
-
-test_that("wallyplot errors when x and y lengths are mismatched", {
-  pdf(tempfile())
-  on.exit(dev.off())
-  expect_error(wallyplot(1:20, rnorm(15)))
+test_that("invalid inputs raise informative errors", {
+  expect_error(wallyplot(1:20, rnorm(15), hide = FALSE), "must be a vector and matrix")
+  expect_error(wallyplot(1:20, matrix(0, 20, 5), hide = FALSE), "y must be a matrix with 9 columns")
+  expect_error(wallyplot(1:20, matrix(0, 15, 9), hide = FALSE), "x and y does not conform")
 })

@@ -1,39 +1,47 @@
-context("Test write.xml")
+xml_data <- data.frame(a = 1:2, b = c("x", "y"))
 
-test_that("Writes a collapsed XML file with one row per observation", {
-    df <- data.frame(a = 1:2, b = c("x", "y"))
-    tf <- tempfile(fileext = ".xml")
-    on.exit(unlink(tf))
+test_that("write.xml writes one collapsed row element per observation", {
+  path <- withr::local_tempfile(fileext = ".xml")
 
-    write.xml(df, file = tf)
-    lines <- readLines(tf)
-
-    expect_equal(lines[1], '<?xml version="1.0"?>')
-    expect_equal(lines[2], "<document>")
-    expect_equal(lines[length(lines)], "</document>")
-    expect_true(any(grepl("<row><a>1</a><b>x</b></row>", lines, fixed = TRUE)))
-    expect_true(any(grepl("<row><a>2</a><b>y</b></row>", lines, fixed = TRUE)))
+  expect_invisible(res <- write.xml(xml_data, file = path))
+  expect_equal(res, 0)
+  expect_equal(readLines(path), c(
+    '<?xml version="1.0"?>',
+    "<document>",
+    "  <row><a>1</a><b>x</b></row>",
+    "  <row><a>2</a><b>y</b></row>",
+    "</document>"
+  ))
 })
 
-test_that("collapse=FALSE writes each field on its own indented line", {
-    df <- data.frame(a = 1:2, b = c("x", "y"))
-    tf <- tempfile(fileext = ".xml")
-    on.exit(unlink(tf))
+test_that("collapse = FALSE writes each field on its own indented line", {
+  path <- withr::local_tempfile(fileext = ".xml")
+  write.xml(xml_data, file = path, collapse = FALSE)
 
-    write.xml(df, file = tf, collapse = FALSE)
-    content <- paste(readLines(tf), collapse = "\n")
-
-    expect_true(grepl("<a>1</a>", content, fixed = TRUE))
-    expect_true(grepl("    <b>x</b>", content, fixed = TRUE))
+  expect_equal(readLines(path), c(
+    '<?xml version="1.0"?>',
+    "<document>",
+    "  <row>", "    <a>1</a>", "    <b>x</b>", "  </row>",
+    "  <row>", "    <a>2</a>", "    <b>y</b>", "  </row>",
+    "</document>"
+  ))
 })
 
-test_that("Missing filename raises an error", {
-    df <- data.frame(a = 1:2)
-    expect_error(write.xml(df), "filename not specified")
+test_that("factor and decimal columns are written as text", {
+  path <- withr::local_tempfile(fileext = ".xml")
+  write.xml(data.frame(f = factor("lvl"), n = 1.5), file = path)
+  expect_equal(readLines(path)[3], "  <row><f>lvl</f><n>1.5</n></row>")
 })
 
-test_that("Non-data.frame input raises an error", {
-    tf <- tempfile(fileext = ".xml")
-    on.exit(unlink(tf))
-    expect_error(write.xml(1:5, file = tf), "data must be a data frame")
+test_that("a data frame without rows writes an empty document", {
+  skip_known_bug("B42")
+  path <- withr::local_tempfile(fileext = ".xml")
+  write.xml(xml_data[0, ], file = path)
+  expect_equal(readLines(path), c('<?xml version="1.0"?>', "<document>", "</document>"))
+})
+
+test_that("invalid inputs raise informative errors", {
+  expect_error(write.xml(xml_data), "filename not specified")
+  path <- withr::local_tempfile(fileext = ".xml")
+  expect_error(write.xml(1:5, file = path), "data must be a data frame")
 })

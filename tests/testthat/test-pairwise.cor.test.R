@@ -1,54 +1,64 @@
-context("Test pairwise.cor.test")
+make_grouped_data <- function() {
+  withr::local_seed(42)
+  data.frame(x = rnorm(30), g = factor(rep(c("A", "B", "C"), each = 10)))
+}
 
-test_that("documented example returns a pairwise.htest object", {
-    Month <- factor(airquality$Month, labels = month.abb[5:9])
-    res <- suppressWarnings(with(airquality, pairwise.cor.test(Ozone, Month)))
+test_that("pairwise.cor.test p-values equal adjusted cor.test p-values", {
+  d <- make_grouped_data()
+  xa <- d$x[d$g == "A"]
+  xb <- d$x[d$g == "B"]
+  xc <- d$x[d$g == "C"]
+  raw <- c(cor.test(xb, xa)$p.value, cor.test(xc, xa)$p.value, cor.test(xc, xb)$p.value)
 
-    expect_s3_class(res, "pairwise.htest")
-    expect_true(all(c("method", "data.name", "p.value", "p.adjust.method") %in% names(res)))
-    expect_equal(res$method, "Pearson's product-moment correlation")
+  res <- pairwise.cor.test(d$x, d$g)
+  expect_s3_class(res, "pairwise.htest")
+  expect_identical(res$p.adjust.method, "holm")
+  expect_identical(res$method, "Pearson's product-moment correlation")
+  expect_identical(res$data.name, "d$x and d$g")
+
+  adjusted <- p.adjust(raw, "holm")
+  expect_equal(res$p.value["B", "A"], adjusted[1])
+  expect_equal(res$p.value["C", "A"], adjusted[2])
+  expect_equal(res$p.value["C", "B"], adjusted[3])
+  expect_identical(res$p.value["B", "B"], NA_real_)
 })
 
-test_that("p.adjust.method is recorded and affects the adjusted p-values", {
-    Month <- factor(airquality$Month, labels = month.abb[5:9])
-    res_default <- suppressWarnings(with(airquality, pairwise.cor.test(Ozone, Month)))
-    res_bonf <- suppressWarnings(with(airquality, pairwise.cor.test(Ozone, Month, p.adjust.method = "bonf")))
+test_that("pairwise.cor.test honours p.adjust.method", {
+  d <- make_grouped_data()
+  raw <- pairwise.cor.test(d$x, d$g, p.adjust.method = "none")$p.value
+  bonf <- pairwise.cor.test(d$x, d$g, p.adjust.method = "bonferroni")
 
-    expect_equal(res_default$p.adjust.method, "holm")
-    expect_equal(res_bonf$p.adjust.method, "bonferroni")
-    expect_false(isTRUE(all.equal(res_default$p.value, res_bonf$p.value)))
+  expect_identical(bonf$p.adjust.method, "bonferroni")
+  expect_equal(bonf$p.value, pmin(3 * raw, 1))
 })
 
-test_that("method argument accepts pearson, kendall and spearman", {
-    Month <- factor(airquality$Month, labels = month.abb[5:9])
+test_that("pairwise.cor.test supports kendall and spearman and passes ... to cor.test", {
+  d <- make_grouped_data()
+  xa <- d$x[d$g == "A"]
+  xb <- d$x[d$g == "B"]
 
-    res_p <- suppressWarnings(with(airquality, pairwise.cor.test(Ozone, Month, method = "pearson")))
-    res_k <- suppressWarnings(with(airquality, pairwise.cor.test(Ozone, Month, method = "kendall")))
-    res_s <- suppressWarnings(with(airquality, pairwise.cor.test(Ozone, Month, method = "spearman")))
+  kendall <- pairwise.cor.test(d$x, d$g, method = "kendall", p.adjust.method = "none")
+  expect_identical(kendall$method, "Kendall's rank correlation tau")
+  expect_equal(kendall$p.value["B", "A"], cor.test(xb, xa, method = "kendall")$p.value)
 
-    expect_equal(res_p$method, "Pearson's product-moment correlation")
-    expect_equal(res_k$method, "Kendall's rank correlation tau")
-    expect_equal(res_s$method, "Spearman's rank correlation rho")
+  spearman <- pairwise.cor.test(d$x, d$g, method = "spearman", p.adjust.method = "none")
+  expect_identical(spearman$method, "Spearman's rank correlation rho")
+  expect_equal(spearman$p.value["B", "A"], cor.test(xb, xa, method = "spearman")$p.value)
+
+  greater <- pairwise.cor.test(d$x, d$g, p.adjust.method = "none", alternative = "greater")
+  expect_equal(greater$p.value["B", "A"], cor.test(xb, xa, alternative = "greater")$p.value)
 })
 
-test_that("mismatched group sizes yield NA p-values (with a warning) instead of an error", {
-    set.seed(42)
-    x <- c(rnorm(5), rnorm(7), rnorm(5))
-    g <- factor(c(rep("A", 5), rep("B", 7), rep("C", 5)))
+test_that("pairwise.cor.test returns NA with a warning for unequal group sizes", {
+  x <- c(1, 2, 3, 4, 5, 2, 4, 6, 8, 10, 12, 14)
+  g <- rep(c("A", "B"), c(5, 7))
 
-    expect_warning(res <- pairwise.cor.test(x, g), "Group sizes are not identical")
-
-    expect_s3_class(res, "pairwise.htest")
-    # A vs B and B vs C have mismatched sizes (5 vs 7) -> NA
-    expect_true(is.na(res$p.value["B", "A"]))
-    expect_true(is.na(res$p.value["C", "B"]))
-    # A vs C have matching sizes (5 vs 5) -> a real p-value
-    expect_false(is.na(res$p.value["C", "A"]))
-    expect_true(res$p.value["C", "A"] >= 0 && res$p.value["C", "A"] <= 1)
+  expect_warning(res <- pairwise.cor.test(x, g), "Group sizes are not identical")
+  expect_identical(res$p.value["B", "A"], NA_real_)
 })
 
-test_that("invalid method and p.adjust.method arguments raise an error", {
-    Month <- factor(airquality$Month, labels = month.abb[5:9])
-    expect_error(with(airquality, pairwise.cor.test(Ozone, Month, method = "notamethod")))
-    expect_error(with(airquality, pairwise.cor.test(Ozone, Month, p.adjust.method = "notamethod")))
+test_that("pairwise.cor.test rejects unknown method arguments", {
+  d <- make_grouped_data()
+  expect_error(pairwise.cor.test(d$x, d$g, method = "nope"), "should be one of")
+  expect_error(pairwise.cor.test(d$x, d$g, p.adjust.method = "nope"), "should be one of")
 })

@@ -1,76 +1,78 @@
-test_that("extended.shared.pedigree returns a symmetric matrix with expected diagonal", {
-  test1 <- data.frame(id  = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14),
-                      mom  = c(0, 0, 0, 0, 2, 2, 4, 4, 6,  2,  0,  0, 12, 13),
-                      dad  = c(0, 0, 0, 0, 1, 1, 3, 3, 3,  7,  0,  0, 11, 10),
-                      sex  = c(1, 2, 1, 2, 1, 2, 1, 2, 1,  1,  1,  2,  2,  2))
-  tped <- with(test1, kinship2::pedigree(id, dad, mom, sex))
+# Nuclear family: father 1, mother 2, children 3 and 4
+make_nuclear_family <- function() {
+  kinship2::pedigree(1:4, c(0, 0, 1, 1), c(0, 0, 2, 2), c(1, 2, 1, 2))
+}
 
-  result <- extended.shared(tped)
+# Expected correlation for a nuclear family under the extended model:
+#   spouses: rho, parent-child: theta * (1 + rho) / 2,
+#   siblings: theta^2 * (1 + rho) / 2, all variances 1.
+nuclear_expected <- function(rho, theta) {
+  pc <- theta * (1 + rho) / 2
+  sib <- theta^2 * (1 + rho) / 2
+  m <- matrix(c(
+    1,   rho, pc,  pc,
+    rho, 1,   pc,  pc,
+    pc,  pc,  1,   sib,
+    pc,  pc,  sib, 1
+  ), 4, 4, dimnames = list(as.character(1:4), as.character(1:4)))
+  m
+}
 
-  expect_true(is.matrix(result))
+test_that("extended.shared() matches the closed form for a nuclear family", {
+  ped <- make_nuclear_family()
+
+  expect_equal(extended.shared(ped), nuclear_expected(rho = 1, theta = 1))
+  expect_equal(extended.shared(ped, rho = 0.5, theta = 0.5), nuclear_expected(0.5, 0.5))
+  expect_equal(extended.shared(ped, rho = 0, theta = 1), nuclear_expected(0, 1))
+})
+
+test_that("extended.shared() returns a symmetric matrix for the 14-person pedigree", {
+  result <- extended.shared(make_pedigree())
+
   expect_equal(dim(result), c(14, 14))
-  expect_equal(dimnames(result), list(as.character(tped$id), as.character(tped$id)))
-  expect_true(isSymmetric(unname(result)))
-
-  expected_diag <- c(1, 1, 1, 1, 1, 1, 1, 1, 0.5, 0.5, 1, 1, 1, 0.375)
-  expect_equal(unname(diag(result)), expected_diag)
+  expect_equal(dimnames(result), list(as.character(1:14), as.character(1:14)))
+  expect_true(isSymmetric(result))
+  # Individuals with two founder parents have variance 1. Individual 9 has a
+  # founder father (3) and a non-founder mother (6) that are uncorrelated, so
+  # the variance is 2 * (1/2)^2 = 0.5 (likewise 10). Individual 14 has
+  # uncorrelated parents with variances 0.5 and 1: (0.5 + 1) / 4 = 0.375.
+  expect_equal(unname(diag(result)), c(rep(1, 8), 0.5, 0.5, 1, 1, 1, 0.375))
 })
 
-test_that("extended.shared.pedigree changes with rho and theta", {
-  test1 <- data.frame(id  = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14),
-                      mom  = c(0, 0, 0, 0, 2, 2, 4, 4, 6,  2,  0,  0, 12, 13),
-                      dad  = c(0, 0, 0, 0, 1, 1, 3, 3, 3,  7,  0,  0, 11, 10),
-                      sex  = c(1, 2, 1, 2, 1, 2, 1, 2, 1,  1,  1,  2,  2,  2))
-  tped <- with(test1, kinship2::pedigree(id, dad, mom, sex))
-
-  default_result <- extended.shared(tped)
-  changed_result <- extended.shared(tped, rho = 0.5, theta = 0.5)
-
-  expect_false(isTRUE(all.equal(default_result, changed_result)))
+test_that("extended.shared() handles a single-person pedigree", {
+  one <- kinship2::pedigree(1, NA, NA, "male")
+  expect_identical(extended.shared(one), matrix(1, 1, 1, dimnames = list("1", "1")))
 })
 
-test_that("extended.shared.pedigree handles a size-1 pedigree", {
-  one <- data.frame(id = 1, dadid = NA, momid = NA, sex = "male")
-  pone <- with(one, kinship2::pedigree(id, dadid, momid, sex))
-
-  result <- extended.shared(pone)
-
-  expect_equal(dim(result), c(1, 1))
-  expect_equal(result[1, 1], 1)
+test_that("extended.shared() handles a pedigree with a single non-founder", {
+  skip_known_bug("B21")
+  trio <- kinship2::pedigree(1:3, c(0, 0, 1), c(0, 0, 2), c(1, 2, 1))
+  expect_equal(extended.shared(trio), nuclear_expected(1, 1)[1:3, 1:3])
 })
 
-test_that("extended.shared.pedigree errors on duplicated ids", {
-  test1 <- data.frame(id  = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14),
-                      mom  = c(0, 0, 0, 0, 2, 2, 4, 4, 6,  2,  0,  0, 12, 13),
-                      dad  = c(0, 0, 0, 0, 1, 1, 3, 3, 3,  7,  0,  0, 11, 10),
-                      sex  = c(1, 2, 1, 2, 1, 2, 1, 2, 1,  1,  1,  2,  2,  2))
-  tped <- with(test1, kinship2::pedigree(id, dad, mom, sex))
-  badped <- tped
-  badped$id[2] <- badped$id[1]
-
-  expect_error(extended.shared(badped), "All id values must be unique")
+test_that("extended.shared() errors on duplicated ids", {
+  ped <- make_pedigree()
+  ped$id[2] <- ped$id[1]
+  expect_error(extended.shared(ped), "All id values must be unique")
 })
 
-test_that("extended.shared.pedigreeList returns a block-diagonal Matrix", {
-  fam <- data.frame(
-    id    = c(1, 2, 3, 4, 11, 12, 13, 14),
-    dadid = c(NA, NA, 1, 1, NA, NA, 11, 11),
-    momid = c(NA, NA, 2, 2, NA, NA, 12, 12),
-    sex   = c("male", "female", "male", "female",
-              "male", "female", "male", "female"),
-    famid = c("A", "A", "A", "A", "B", "B", "B", "B")
-  )
-  pedlist <- with(fam, kinship2::pedigree(id, dadid, momid, sex, famid = famid))
-  expect_true(inherits(pedlist, "pedigreeList"))
+test_that("extended.shared() gives a block-diagonal sparse Matrix for a pedigreeList", {
+  result <- extended.shared(make_two_families())
 
-  result <- extended.shared(pedlist)
+  expect_s4_class(result, "Matrix")
+  expected <- as.matrix(Matrix::bdiag(nuclear_expected(1, 1), nuclear_expected(1, 1)))
+  ids <- as.character(c(1:4, 11:14))
+  dimnames(expected) <- list(ids, ids)
+  expect_equal(as.matrix(result), expected)
+})
 
-  expect_true(inherits(result, "Matrix"))
-  expect_equal(dim(result), c(8, 8))
-  expect_equal(dimnames(result), list(as.character(fam$id), as.character(fam$id)))
+test_that("extended.shared() prefixes famid when ids repeat across families", {
+  result <- extended.shared(make_two_families(id = c(1:4, 1:4)))
+  expect_equal(colnames(result), paste(rep(c("A", "B"), each = 4), 1:4, sep = "/"))
+})
 
-  mat <- as.matrix(result)
-  # cross-family entries are 0
-  expect_equal(mat["1", "11"], 0)
-  expect_equal(mat["4", "14"], 0)
+test_that("extended.shared() passes rho and theta on for a pedigreeList", {
+  skip_known_bug("B05")
+  result <- extended.shared(make_two_families(), rho = 0.5, theta = 0.5)
+  expect_equal(as.matrix(result)[1:4, 1:4], nuclear_expected(0.5, 0.5), ignore_attr = TRUE)
 })

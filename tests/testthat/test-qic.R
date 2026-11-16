@@ -1,168 +1,109 @@
-context("Test QIC.geeglm / QIC.ordgee / QIC.geekin")
-
-suppressPackageStartupMessages(library(geepack))
-
-## ---- Shared fixture --------------------------------------------------
-set.seed(1)
-n_clusters <- 20
-cluster_size <- 4
-id <- rep(1:n_clusters, each = cluster_size)
-age <- rep(1:cluster_size, times = n_clusters)
-x1 <- rnorm(n_clusters * cluster_size)
-u <- rep(rnorm(n_clusters, sd = 0.5), each = cluster_size)  # cluster-level random effect
-p <- plogis(-0.5 + 0.8 * x1 + 0.3 * age + u)
-y <- rbinom(length(p), 1, p)
-dat <- data.frame(id = id, y = y, x1 = x1, age = age)
-
-fit_geeglm  <- geepack::geeglm(y ~ x1 + age, id = id, data = dat, family = binomial, corstr = "exchangeable")
-fit_geeglm2 <- geepack::geeglm(y ~ x1,       id = id, data = dat, family = binomial, corstr = "exchangeable")
-
-expected_names <- c("QIC", "QICu", "Quasi Lik", "CIC", "params", "QICC")
-
-# NOTE on two deviations required to properly test MESS::QIC() in this file:
+# MESS::QIC() is checked against geepack::QIC(), which implements the same
+# criterion. Always call MESS::QIC explicitly because geepack exports a QIC()
+# generic too.
 #
-# 1) geepack itself exports a function called QIC() (with its own
-#    QIC.geeglm/QIC.ordgee methods). Since this file attaches geepack with
-#    library(geepack), and geepack's attach happens *after* MESS is loaded,
-#    an unqualified `QIC(...)` call resolves to geepack::QIC, not MESS::QIC
-#    -- silently testing the wrong package's (differently implemented, and
-#    not buggy in the way described below) function. All calls below are
-#    therefore qualified as MESS::QIC() to guarantee we exercise MESS's own
-#    generic and its registered S3 methods (QIC.geeglm/QIC.ordgee/QIC.geekin).
-#
-# 2) MESS::QIC.geeglm()'s internal computeqic() helper refits the model with
-#    corstr="independence" via `eval(object$call, parent.frame())`. Because
-#    this eval() lives inside a closure (computeqic) nested inside
-#    QIC.geeglm, `parent.frame()` there resolves to QIC.geeglm's own
-#    execution frame rather than to the original caller's frame (contrast
-#    with geepack's own QIC.geeglm, which captures `env = parent.frame()` as
-#    a formal default argument -- evaluated one frame further out -- and
-#    passes that along explicitly). Free variables referenced by the stored
-#    model call (here `dat`/`id`/`dat_gauss`) are therefore looked up via
-#    QIC.geeglm's lexical enclosure (the MESS namespace) rather than this
-#    test file's environment, and must be placed in .GlobalEnv for the
-#    refit to find them. This is a latent environment-handling bug in
-#    MESS::QIC.geeglm, analogous to the one documented for drop1.geeglm's
-#    score/sasscore branch in test-drop1.geeglm.R.
+# Models are fitted with `data = <pkg>::<dataset>` so the stored call can be
+# re-evaluated by QIC's internal refit from any environment (see B09 for the
+# case where the data lives in a local variable).
 
-## ---- QIC.geeglm: single model -------------------------------------------
+qic_names <- c("QIC", "QICu", "Quasi Lik", "CIC", "params", "QICC")
 
-test_that("QIC on a single geeglm object returns a named numeric vector of finite values", {
-    assign("dat", dat, envir = .GlobalEnv)
-    assign("id", id, envir = .GlobalEnv)
-    on.exit(rm(list = c("dat", "id"), envir = .GlobalEnv), add = TRUE)
+test_that("QIC for a binomial geeglm matches geepack::QIC", {
+  fit <- geepack::geeglm(resp ~ age + smoke, id = id, data = geepack::ohio,
+                         family = binomial, corstr = "exchangeable")
+  res <- MESS::QIC(fit)
 
-    out <- MESS::QIC(fit_geeglm)
-    expect_type(out, "double")
-    expect_null(dim(out))
-    expect_equal(names(out), expected_names)
-    expect_true(all(is.finite(out)))
-    expect_equal(unname(out["params"]), 3)
+  expect_named(res, qic_names)
+  expect_equal(res, geepack::QIC(fit))
+  expect_equal(unname(res["params"]), 3)
+  expect_equal(unname(res["QIC"]), 1829.482937, tolerance = 1e-8)
 })
 
-## ---- QIC.geeglm: multi-model comparison ----------------------------------
-#
-# NOTE (latent bug): QIC()'s signature is `QIC(object, tol=.Machine$double.eps, ...)`
-# -- `tol` is the *second* formal, positioned before `...`. This means the
-# naive, "obvious" way of comparing two models, QIC(fit_geeglm, fit_geeglm2),
-# does NOT send fit_geeglm2 to `...`: ordinary R argument matching binds the
-# second *positional* argument to `tol` instead, silently turning the second
-# model object into the `tol` value used for matrix inversion deep inside
-# computeqic() and erroring with "non-numeric argument to binary operator".
-# Naming `tol` explicitly to work around this (QIC(fit_geeglm, fit_geeglm2,
-# tol=.Machine$double.eps)) does not help either: match.call() inside
-# QIC.geeglm then captures `tol` as one of the matched arguments too, which
-# inflates Call[-1L] beyond the number of fitted rows and breaks the
-# `row.names(res) <- as.character(Call[-1L])` step. The only way to reach
-# QIC's multi-model comparison path without tripping over `tol` is to pass
-# additional models as *named* `...` arguments (any name other than "tol"),
-# e.g. QIC(fit_geeglm, model2 = fit_geeglm2).
+test_that("QIC for gaussian, poisson and Gamma geeglm fits matches geepack::QIC", {
+  gaussian_fit <- geepack::geeglm(Weight ~ Time, id = Pig, data = geepack::dietox,
+                                  family = gaussian, corstr = "ar1")
+  expect_equal(MESS::QIC(gaussian_fit), geepack::QIC(gaussian_fit))
 
-test_that("the naive positional multi-model call QIC(fit1, fit2) is broken (latent bug)", {
-    assign("dat", dat, envir = .GlobalEnv)
-    assign("id", id, envir = .GlobalEnv)
-    on.exit(rm(list = c("dat", "id"), envir = .GlobalEnv), add = TRUE)
+  poisson_fit <- geepack::geeglm(y ~ trt + lbase, id = subject, data = MASS::epil,
+                                 family = poisson, corstr = "exchangeable")
+  expect_equal(MESS::QIC(poisson_fit), geepack::QIC(poisson_fit))
 
-    expect_error(MESS::QIC(fit_geeglm, fit_geeglm2))
+  gamma_fit <- geepack::geeglm(Weight ~ Time, id = Pig, data = geepack::dietox,
+                               family = Gamma, corstr = "ar1")
+  expect_equal(MESS::QIC(gamma_fit), geepack::QIC(gamma_fit))
 })
 
-test_that("QIC comparing two geeglm models (passed as a named ... argument) returns a matrix with one row per model", {
-    assign("dat", dat, envir = .GlobalEnv)
-    assign("id", id, envir = .GlobalEnv)
-    on.exit(rm(list = c("dat", "id"), envir = .GlobalEnv), add = TRUE)
+test_that("several models passed through ... give one row per model", {
+  fit1 <- geepack::geeglm(resp ~ age + smoke, id = id, data = geepack::ohio,
+                          family = binomial, corstr = "exchangeable")
+  fit2 <- geepack::geeglm(resp ~ age, id = id, data = geepack::ohio,
+                          family = binomial, corstr = "exchangeable")
 
-    out <- MESS::QIC(fit_geeglm, model2 = fit_geeglm2)
-    expect_true(is.matrix(out) || is.data.frame(out))
-    expect_equal(nrow(out), 2)
-    expect_equal(colnames(out), expected_names)
-    expect_true(all(is.finite(out)))
-    # Different mean models -> different number of mean parameters
-    expect_equal(unname(out[, "params"]), c(3, 2))
+  res <- MESS::QIC(fit1, model2 = fit2)
+
+  expect_equal(dim(res), c(2, 6))
+  expect_equal(colnames(res), qic_names)
+  expect_equal(rownames(res), c("fit1", "fit2"))
+  expect_equal(res[1, ], geepack::QIC(fit1))
+  expect_equal(res[2, ], geepack::QIC(fit2))
 })
 
-## ---- QIC.geeglm: gaussian branch of the quasi-likelihood switch() --------
-
-test_that("QIC exercises the gaussian branch of the quasi-likelihood computation", {
-    y_cont <- -0.5 + 0.8 * x1 + 0.3 * age + u + rnorm(length(x1), sd = 0.5)
-    dat_gauss <- dat
-    dat_gauss$ycont <- y_cont
-    fit_gauss <- geepack::geeglm(ycont ~ x1 + age, id = id, data = dat_gauss,
-                                  family = gaussian, corstr = "exchangeable")
-
-    assign("dat_gauss", dat_gauss, envir = .GlobalEnv)
-    assign("id", id, envir = .GlobalEnv)
-    on.exit(rm(list = c("dat_gauss", "id"), envir = .GlobalEnv), add = TRUE)
-
-    out <- MESS::QIC(fit_gauss)
-    expect_equal(names(out), expected_names)
-    expect_true(all(is.finite(out)))
+test_that("comparing models fitted to different numbers of observations warns", {
+  fit1 <- geepack::geeglm(resp ~ age, id = id, data = geepack::ohio, family = binomial)
+  fit2 <- geepack::geeglm(resp ~ age, id = id, data = geepack::ohio[geepack::ohio$smoke == 1, ],
+                          family = binomial)
+  expect_warning(
+    MESS::QIC(fit1, model2 = fit2),
+    "models are not all fitted to the same number of observations"
+  )
 })
 
-## ---- QIC.ordgee ------------------------------------------------------
+test_that("QIC for a geekin fit equals QIC for the equivalent exchangeable geeglm", {
+  # geekin() evaluates geeglm() in the caller's frame, so geepack must be attached (B35)
+  withr::local_package("geepack")
+  pig <- geepack::dietox$Pig[1:120]
+  # A block-diagonal matrix of ones per cluster is equivalent to an
+  # exchangeable working correlation
+  block <- outer(pig, pig, "==") * 1
 
-test_that("QIC.ordgee's class guard requires 'geeglm' in class(object) (latent bug)", {
-    # QIC.ordgee() is dispatched for objects of class "ordgee", yet its very
-    # first check is
-    #   if (! ("geeglm" %in% class(object)) ) stop("QIC requires a geeglm object as input")
-    # which means a *bona fide* ordgee object (whose class is "ordgee", not
-    # "geeglm") will always fail this check. This is the realistic, reachable
-    # behavior through the public QIC() generic, so we assert the error
-    # rather than a successful computation.
-    x <- structure(list(), class = "ordgee")
-    expect_error(MESS::QIC(x))
+  kin_fit <- geekin(Weight ~ Time, id = geepack::dietox$Pig[1:120],
+                    data = geepack::dietox[1:120, ], varlist = list(block))
+  exch_fit <- geepack::geeglm(Weight ~ Time, id = Pig, data = geepack::dietox[1:120, ],
+                              corstr = "exchangeable")
+
+  expect_equal(MESS::QIC(kin_fit), geepack::QIC(exch_fit), tolerance = 1e-6)
 })
 
-## ---- QIC.geekin ------------------------------------------------------
-
-test_that("QIC on a geekin fit returns the same structure/field names as QIC on a geeglm fit", {
-    V <- matrix(0, nrow(dat), nrow(dat))
-    for (cl in unique(id)) {
-        ix <- which(id == cl)
-        V[ix, ix] <- 1
-    }
-    diag(V) <- 1
-    varlist <- list(V)
-
-    # NOTE: geekin()'s `family` argument defaults to gaussian; the shared
-    # fixture's `y` is binary, so family = binomial must be supplied
-    # explicitly to get a model comparable to fit_geeglm (see also
-    # test-geekin.R).
-    fitkin <- geekin(y ~ x1 + age, id = id, data = dat, family = binomial, varlist = varlist)
-
-    # geekin() deliberately overwrites geeFit$call with the user-facing call
-    # to geekin(...) (see R/geekin.R, "Cheat the output..."), so QIC.geekin's
-    # internal re-dispatch to QIC.geeglm needs `dat`/`id` visible the same
-    # way as the plain geeglm fits above.
-    assign("dat", dat, envir = .GlobalEnv)
-    assign("id", id, envir = .GlobalEnv)
-    on.exit(rm(list = c("dat", "id"), envir = .GlobalEnv), add = TRUE)
-
-    out <- MESS::QIC(fitkin)
-    expect_equal(names(out), expected_names)
-    expect_true(all(is.finite(out)))
+test_that("an unsupported family raises an error", {
+  fit <- geepack::geeglm(Weight ~ Time, id = Pig, data = geepack::dietox)
+  fit$family$family <- "unsupported"
+  expect_error(MESS::QIC(fit), "distribution not recognized")
 })
 
-test_that("QIC.geekin's class guard requires 'geeglm' in class(object)", {
-    x <- structure(list(), class = "geekin")
-    expect_error(MESS::QIC(x))
+test_that("non-geeglm objects are rejected", {
+  expect_error(MESS::QIC(structure(list(), class = "geekin")), "QIC requires a geekin object")
+  expect_error(MESS::QIC(lm(dist ~ speed, data = cars)), class = "error")
+})
+
+test_that("QIC works when the model data is a local variable", {
+  skip_known_bug("B09")
+  dat <- geepack::ohio
+  fit <- geepack::geeglm(resp ~ age + smoke, id = id, data = dat,
+                         family = binomial, corstr = "exchangeable")
+  expect_equal(MESS::QIC(fit), geepack::QIC(fit))
+})
+
+test_that("models can be compared by passing them positionally", {
+  skip_known_bug("B11")
+  fit1 <- geepack::geeglm(resp ~ age + smoke, id = id, data = geepack::ohio, family = binomial)
+  fit2 <- geepack::geeglm(resp ~ age, id = id, data = geepack::ohio, family = binomial)
+
+  res <- MESS::QIC(fit1, fit2)
+  expect_equal(dim(res), c(2, 6))
+})
+
+test_that("QIC works for an ordgee fit", {
+  skip_known_bug("B10")
+  fit <- geepack::ordgee(ordered(resp) ~ age, id = id, data = geepack::ohio)
+  expect_named(MESS::QIC(fit), qic_names)
 })

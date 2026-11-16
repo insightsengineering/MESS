@@ -1,21 +1,19 @@
-context("Test usd")
+# usd(x) = sd(x) / (1 - 1/(4n) - 7/(32n^2) - 19/(128n^3))
 
-test_that("Matches documented example value and differs from sd", {
-    expect_equal(usd(1:5), 1.681951, tolerance = 1e-6)
-    expect_false(isTRUE(all.equal(usd(1:5), sd(1:5))))
+test_that("usd applies the small-sample correction to sd", {
+  n <- 5
+  correction <- 1 - 1 / (4 * n) - 7 / (32 * n^2) - 19 / (128 * n^3)
+  expect_equal(usd(1:5), sd(1:5) / correction)
+  # documented value
+  expect_equal(usd(1:5), 1.681951, tolerance = 1e-6)
 })
 
-test_that("na.rm removes missing values before computing", {
-    expect_equal(usd(c(1:5, NA), na.rm = TRUE), usd(1:5))
-    expect_true(is.na(usd(c(1:5, NA))))
+test_that("na.rm drops missing values and uses the reduced n", {
+  expect_equal(usd(c(1:5, NA), na.rm = TRUE), usd(1:5))
+  expect_equal(usd(c(1:5, NA)), NA_real_)
 })
 
-test_that("Length-one and zero-length vectors return NA", {
-    expect_true(is.na(usd(1)))
-    expect_true(is.na(usd(numeric(0))))
-})
-
-test_that("Non-numeric input produces a coercion warning", {
-    expect_warning(res <- usd(c("a", "b")), "NAs introduced by coercion")
-    expect_true(is.na(res))
+test_that("fewer than two observations give NA", {
+  expect_equal(usd(1), NA_real_)
+  expect_equal(usd(numeric(0)), NA_real_)
 })

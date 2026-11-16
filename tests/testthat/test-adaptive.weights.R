@@ -1,68 +1,45 @@
-context("Test adaptive.weights")
+make_aw_data <- function(n = 50, p = 5, seed = 1) {
+  withr::local_seed(seed)
+  x <- matrix(rnorm(n * p), nrow = n)
+  list(x = x, y = rnorm(n, mean = x[, 1]))
+}
 
-test_that("multivariate method matches manually-computed lm coefficients", {
-    set.seed(1)
-    x <- matrix(rnorm(50*5), nrow=50)
-    y <- rnorm(50, mean=x[,1])
+univariate_weights <- function(x, y, nu = 1) {
+  apply(x, 2, function(xi) 1 / abs(coef(lm(y ~ xi))[[2]])^nu)
+}
 
-    res <- adaptive.weights(x, y)
-    manual <- 1/abs(coef(lm(y ~ x))[-1])^1
+test_that("multivariate weights are 1/|beta| from the joint lm() fit", {
+  d <- make_aw_data()
+  res <- adaptive.weights(d$x, d$y)
 
-    expect_equal(unname(res$weights), unname(manual))
-    expect_equal(res$nu, 1)
-    expect_length(res$weights, ncol(x))
+  expect_named(res, c("weights", "nu"))
+  expect_equal(res$nu, 1)
+  expect_equal(unname(res$weights), unname(1 / abs(coef(lm(d$y ~ d$x))[-1])))
 })
 
-test_that("univariate method matches manually-computed per-column lm coefficients", {
-    set.seed(1)
-    x <- matrix(rnorm(50*5), nrow=50)
-    y <- rnorm(50, mean=x[,1])
+test_that("univariate weights are 1/|beta| from one lm() fit per column", {
+  d <- make_aw_data()
+  res <- adaptive.weights(d$x, d$y, weight.method = "univariate")
 
-    res <- adaptive.weights(x, y, weight.method="univariate")
-    manual <- apply(x, 2, function(xi) 1/abs(coef(lm(y ~ xi))[2]))
-
-    expect_equal(unname(res$weights), unname(manual))
+  expect_equal(unname(res$weights), univariate_weights(d$x, d$y))
 })
 
-test_that("nu=0 gives all weights equal to 1 regardless of method", {
-    set.seed(1)
-    x <- matrix(rnorm(50*5), nrow=50)
-    y <- rnorm(50, mean=x[,1])
+test_that("nu is used as the exponent of the weights", {
+  d <- make_aw_data()
+  w1 <- adaptive.weights(d$x, d$y, nu = 1)$weights
 
-    res_multi <- adaptive.weights(x, y, nu=0)
-    res_uni   <- adaptive.weights(x, y, nu=0, weight.method="univariate")
-
-    expect_equal(unname(res_multi$weights), rep(1, ncol(x)))
-    expect_equal(unname(res_uni$weights), rep(1, ncol(x)))
+  expect_equal(adaptive.weights(d$x, d$y, nu = 2)$weights, w1^2)
+  expect_equal(unname(adaptive.weights(d$x, d$y, nu = 0)$weights), rep(1, 5))
 })
 
-test_that("weights scale predictably with nu (nu=2 is the square of nu=1)", {
-    set.seed(1)
-    x <- matrix(rnorm(50*5), nrow=50)
-    y <- rnorm(50, mean=x[,1])
+test_that("univariate weights are used with a warning when p >= n", {
+  d <- make_aw_data(n = 5, p = 6, seed = 2)
 
-    res1 <- adaptive.weights(x, y, nu=1)
-    res2 <- adaptive.weights(x, y, nu=2)
-
-    expect_equal(unname(res2$weights), unname(res1$weights)^2)
+  expect_warning(res <- adaptive.weights(d$x, d$y), "using univariate weight method since p>n")
+  expect_equal(unname(res$weights), univariate_weights(d$x, d$y))
 })
 
-test_that("falls back to univariate weights with a warning when p > n", {
-    set.seed(2)
-    x <- matrix(rnorm(10*15), nrow=10)
-    y <- rnorm(10, mean=x[,1])
-
-    expect_warning(res <- adaptive.weights(x, y), regexp="univariate")
-
-    manual <- apply(x, 2, function(xi) 1/abs(coef(lm(y ~ xi))[2]))
-    expect_equal(unname(res$weights), unname(manual))
-    expect_length(res$weights, ncol(x))
-})
-
-test_that("invalid weight.method raises an error", {
-    set.seed(1)
-    x <- matrix(rnorm(50*5), nrow=50)
-    y <- rnorm(50, mean=x[,1])
-
-    expect_error(adaptive.weights(x, y, weight.method="bogus"))
+test_that("an invalid weight.method is an error", {
+  d <- make_aw_data()
+  expect_error(adaptive.weights(d$x, d$y, weight.method = "bogus"), "should be one of")
 })

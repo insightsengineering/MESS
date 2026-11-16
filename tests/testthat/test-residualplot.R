@@ -1,79 +1,71 @@
-## -------------------------------------------------------------------------
-## Base-graphics family: residualplot / residualplot.default / .lm / .glm
-## -------------------------------------------------------------------------
+# Small residual data set with one point outside +/- 1.96 (x = 4)
+res_x <- 1:10
+res_y <- c(0.1, -0.2, 0.3, 2.5, -0.1, 0.2, -0.3, 0.1, 0, -0.2)
 
-test_that("residualplot works for an lm object and returns invisible NULL", {
-  pdf(tempfile())
-  on.exit(dev.off())
-  model <- lm(Volume ~ Girth + Height, data = trees)
-  result <- residualplot(model)
-  expect_null(result)
+geom_classes <- function(p) {
+  unname(vapply(p$layers, function(l) class(l$geom)[1], character(1)))
+}
+
+## Base-graphics residualplot() --------------------------------------------
+
+test_that("residualplot draws for numeric vectors, lm and glm fits and returns invisible NULL", {
+  withr::local_pdf(NULL)
+
+  expect_invisible(res <- residualplot(res_x, res_y))
+  expect_null(res)
+  expect_null(residualplot(res_x, res_y, candy = FALSE))
+  expect_null(residualplot(res_x, res_y, col.alpha = 0, ylim = c(-5, 5)))
+  # three or fewer unique x values: no smoothing spline is added
+  expect_null(residualplot(rep(1:3, 4), rep(c(-1, 0, 1), 4)))
+
+  expect_null(residualplot(lm(Volume ~ Girth + Height, data = trees)))
+  expect_null(residualplot(glm(am ~ hp, data = mtcars, family = binomial)))
 })
 
-test_that("residualplot works for a glm object", {
-  pdf(tempfile())
-  on.exit(dev.off())
-  gmodel <- glm(am ~ hp, data = mtcars, family = binomial)
-  expect_no_error(residualplot(gmodel))
-})
-
-test_that("residualplot.default works for plain numeric vectors", {
-  pdf(tempfile())
-  on.exit(dev.off())
-  set.seed(1)
-  expect_no_error(residualplot(1:20, rnorm(20)))
-})
-
-test_that("residualplot works with candy=FALSE", {
-  pdf(tempfile())
-  on.exit(dev.off())
-  model <- lm(Volume ~ Girth + Height, data = trees)
-  expect_no_error(residualplot(model, candy = FALSE))
-})
-
-test_that("residualplot accepts a custom ylim", {
-  pdf(tempfile())
-  on.exit(dev.off())
-  set.seed(1)
-  expect_no_error(residualplot(1:20, rnorm(20), ylim = c(-5, 5)))
-})
-
-test_that("residualplot errors when y is not specified", {
-  pdf(tempfile())
-  on.exit(dev.off())
+test_that("residualplot requires y for the default method", {
   expect_error(residualplot(1:5), "y must be specified")
 })
 
-## -------------------------------------------------------------------------
-## ggplot2-based family: residual_plot / residual_plot.default / .lm / .glm
-## -------------------------------------------------------------------------
+## ggplot2 residual_plot() --------------------------------------------------
 
-test_that("residual_plot returns a ggplot object for an lm model", {
-  model <- lm(Volume ~ Girth + Height, data = trees)
-  p <- residual_plot(model)
+test_that("residual_plot with candy = FALSE only draws the points", {
+  p <- residual_plot(res_x, res_y, candy = FALSE)
   expect_s3_class(p, "ggplot")
+  expect_equal(geom_classes(p), "GeomPoint")
 })
 
-test_that("residual_plot returns a ggplot object for a glm model", {
-  gmodel <- glm(am ~ hp, data = mtcars, family = binomial)
-  p <- residual_plot(gmodel)
-  expect_s3_class(p, "ggplot")
+test_that("residual_plot with candy adds spline, ribbon and outlier layers", {
+  p <- residual_plot(res_x, res_y)
+  expect_equal(geom_classes(p), c("GeomPoint", "GeomLine", "GeomRibbon", "GeomPoint", "GeomPoint"))
+
+  # Without points outside +/- 1.96 the outlier layer is omitted
+  p_no_outlier <- residual_plot(res_x, c(0.1, -0.2, 0.3, 0.5, -0.1, 0.2, -0.3, 0.1, 0, -0.2))
+  expect_equal(geom_classes(p_no_outlier), c("GeomPoint", "GeomLine", "GeomRibbon", "GeomPoint"))
 })
 
-test_that("residual_plot returns a ggplot object for plain numeric vectors", {
-  set.seed(1)
-  p <- residual_plot(1:20, rnorm(20))
-  expect_s3_class(p, "ggplot")
+test_that("residual_plot ribbon is +/- 1.96 local SD within the bandwidth window", {
+  p <- residual_plot(res_x, res_y)
+  ribbon <- ggplot2::layer_data(p, 3)
+
+  # window = 0.3 * (10 - 1) / 2 = 1.35, so at x = 1 the window holds x = 1, 2
+  expect_equal(ribbon$ymax[1], 1.96 * sd(res_y[1:2]))
+  # at x = 5 the window holds x = 4, 5, 6
+  expect_equal(ribbon$ymax[5], 1.96 * sd(res_y[4:6]))
+  expect_equal(ribbon$ymin, -ribbon$ymax)
 })
 
-test_that("residual_plot returns a valid ggplot with candy=TRUE and candy=FALSE", {
-  model <- lm(Volume ~ Girth + Height, data = trees)
-  p_candy <- residual_plot(model, candy = TRUE)
-  p_nocandy <- residual_plot(model, candy = FALSE)
-  expect_s3_class(p_candy, "ggplot")
-  expect_s3_class(p_nocandy, "ggplot")
+test_that("residual_plot uses studentized/standardized residuals for lm and glm fits", {
+  lm_fit <- lm(Volume ~ Girth + Height, data = trees)
+  p_lm <- residual_plot(lm_fit, candy = FALSE)
+  expect_equal(p_lm$data$x, unname(predict(lm_fit)))
+  expect_equal(p_lm$data$y, unname(rstudent(lm_fit)))
+
+  glm_fit <- glm(am ~ hp, data = mtcars, family = binomial)
+  p_glm <- residual_plot(glm_fit, candy = FALSE)
+  expect_equal(p_glm$data$x, unname(predict(glm_fit, type = "link")))
+  expect_equal(p_glm$data$y, unname(rstandard(glm_fit)))
 })
 
-test_that("residual_plot.default errors when y is not specified", {
+test_that("residual_plot requires y for the default method", {
   expect_error(residual_plot(1:5), "y must be specified")
 })
