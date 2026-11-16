@@ -19,3 +19,11 @@ test_that("age() accepts Date input", {
 test_that("age() errors when 'to' is before 'from' in an earlier year", {
   expect_error(age("2016-01-01", "2015-01-01"), "ages cannot be negative")
 })
+
+test_that("age() errors when 'to' is before 'from' within the same year", {
+  expect_error(age("2016-06-01", "2016-01-01"), "ages cannot be negative")
+})
+
+test_that("age() errors when 'to' is before 'from' within the same year/month", {
+  expect_error(age("2016-06-03", "2016-06-01"), "ages cannot be negative")
+})

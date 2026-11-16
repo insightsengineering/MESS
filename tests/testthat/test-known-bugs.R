@@ -5,13 +5,6 @@
 # test back to the test file for that function (the section headers below).
 # See tests/testthat/KNOWN_BUGS.md for details on each defect.
 
-# test-age.R ------------------------------------------------------------------
-
-test_that("age() errors when 'to' is before 'from' within the same year", {
-  skip_known_bug("B20")
-  expect_error(age("2016-06-01", "2016-01-01"), "ages cannot be negative")
-})
-
 # test-auc.R ------------------------------------------------------------------
 
 test_that("auc() with absolutearea = TRUE handles unsorted x values", {
