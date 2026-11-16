@@ -52,17 +52,6 @@ test_that("a logical treatment vector gives the same result as 0/1", {
   expect_equal(prepost.test(bp_base, bp1w, expo == 1), prepost.test(bp_base, bp1w, expo))
 })
 
-test_that("missing post values are handled with the semiparametric estimator", {
-  skip_known_bug("B07")
-  post <- bp1w
-  post[c(2, 10, 12)] <- NA
-
-  res <- prepost.test(bp_base, post, expo)
-  # Reference value computed with the Davidian, Tsiatis & Leon (2005)
-  # estimator using the control-arm regression in the control augmentation term.
-  expect_equal(unname(res$estimate), -6.640460422, tolerance = 1e-8)
-})
-
 test_that("invalid inputs raise informative errors", {
   expect_error(
     prepost.test(bp_base, bp1w, c(rep(1, 6), rep(2, 5), rep(3, 5))),

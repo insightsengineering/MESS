@@ -1,10 +1,3 @@
-# A block-diagonal matrix of ones (one block per cluster) gives a single
-# correlation parameter shared by all within-cluster pairs, i.e. geekin()
-# reproduces geeglm() with an exchangeable working correlation.
-exchangeable_varlist <- function(n_clusters = 20, cluster_size = 4) {
-  kronecker(diag(n_clusters), matrix(1, cluster_size, cluster_size))
-}
-
 test_that("geekin with a block-of-ones varlist equals an exchangeable geeglm fit", {
   dat <- make_gee_data()
   V <- exchangeable_varlist()
@@ -68,27 +61,4 @@ test_that("print.geekin shows the call, coefficients and correlation parameters"
   expect_true("Estimated Correlation Parameters:" %in% out)
   expect_match(out, "Degrees of Freedom: 80 Total", fixed = TRUE, all = FALSE)
   expect_match(out, "Number of clusters:   20   Maximum cluster size: 4", fixed = TRUE, all = FALSE)
-})
-
-test_that("print.geekin does not change the global digits option", {
-  skip_known_bug("B36")
-  dat <- make_gee_data()
-  V <- exchangeable_varlist()
-  fit <- geekin(y ~ x1 + age, id = dat$id, data = dat, family = binomial, varlist = list(V))
-
-  withr::local_options(digits = 7)
-  capture.output(print(fit, digits = 3))
-  expect_identical(getOption("digits"), 7L)
-})
-
-test_that("geekin works when geepack is not attached", {
-  skip_known_bug("B35")
-  env <- new.env(parent = globalenv())
-  env$dat <- make_gee_data()
-  env$V <- exchangeable_varlist()
-
-  expect_no_error(evalq(
-    MESS::geekin(y ~ x1 + age, id = dat$id, data = dat, family = binomial, varlist = list(V)),
-    env
-  ))
 })

@@ -23,9 +23,7 @@ age <- function(from, to) {
 
     age = to_lt$year - from_lt$year
 
-    if (to_lt$mon < from_lt$mon | (to_lt$mon == from_lt$mon & to_lt$mday < from_lt$mday)) {
-        age <- age - 1
-    }
+    age <- ifelse(to_lt$mon < from_lt$mon | (to_lt$mon == from_lt$mon & to_lt$mday < from_lt$mday), age - 1, age)
 
     if (any(age<0))
         stop("ages cannot be negative")

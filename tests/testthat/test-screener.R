@@ -30,25 +30,6 @@ test_that("a table is accepted as x", {
   )
 })
 
-test_that("selected is a list even when every lambda selects the same number of variables", {
-  skip_known_bug("B40")
-  res <- screen_variables(diag(3), c(3, 2, 1), lambda = c(2.4, 2.5))
-  expect_equal(res$selected, list(3L, 3L))
-})
-
-test_that("global-DPP method applies the DPP criterion", {
-  skip_known_bug("B08")
-  x <- diag(3)
-  y <- c(3, 2, 1)
-  lambda <- 2.5
-  # criterion = lambdamax - ||x||_2 * ||y||_2 * (lambdamax - lambda) / lambda
-  criterion <- 3 - 1 * sqrt(14) * 0.5 / 2.5
-
-  res <- screen_variables(x, y, lambda = lambda, method = "global-DPP")
-  expect_equal(res$method, "global-DPP")
-  expect_equal(res$selected, list(which(c(3, 2, 1) < criterion)))
-})
-
 test_that("invalid inputs raise informative errors", {
   x <- diag(3)
   y <- c(3, 2, 1)

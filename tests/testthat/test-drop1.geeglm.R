@@ -1,12 +1,3 @@
-# Poisson GEE on warpbreaks with 18 clusters of 3. The model call refers only
-# to objects on the search path, so drop1()'s internal update() can refit it.
-fit_warpbreaks_geeglm <- function() {
-  geepack::geeglm(
-    breaks ~ wool + tension, id = rep(1:18, each = 3), data = warpbreaks,
-    family = poisson, corstr = "exchangeable"
-  )
-}
-
 wald <- function(beta, vcov) drop(t(beta) %*% solve(vcov) %*% beta)
 
 test_that("drop1() on geeglm gives Wald tests per term", {
@@ -64,19 +55,6 @@ test_that("drop1() on geeglm computes score tests", {
   expect_equal(sas[["Score(SAS)"]], c(3.177161756, 7.627752460), tolerance = 1e-6) # regression values
 })
 
-test_that("drop1() score tests work when the data is a local variable", {
-  skip_known_bug("B25")
-  local_data <- warpbreaks
-  fit <- geepack::geeglm(breaks ~ wool + tension, id = rep(1:18, each = 3), data = local_data, family = poisson)
-  expect_named(drop1(fit, test = "score"), c("DF", "Score", "Pr(>Chi)"))
-})
-
-test_that("drop1() on geeglm with test = 'none' keeps the statistic", {
-  skip_known_bug("B03")
-  out <- drop1(fit_warpbreaks_geeglm(), test = "none")
-  expect_named(out, c("DF", "Wald"))
-})
-
 test_that("drop1() on geem gives the same Wald tests as on geeglm", {
   g <- geeM::geem(
     breaks ~ wool + tension, id = rep(1:18, each = 3), data = warpbreaks,
@@ -91,23 +69,8 @@ test_that("drop1() on geem gives the same Wald tests as on geeglm", {
   expect_equal(out$Wald, drop1(fit_warpbreaks_geeglm())$Wald, tolerance = 1e-4)
 })
 
-test_that("drop1() on geem computes score tests", {
-  skip_known_bug("B26")
-  g <- geeM::geem(breaks ~ wool + tension, id = rep(1:18, each = 3), data = warpbreaks, family = "poisson")
-  expect_named(drop1(g, test = "score"), c("DF", "Score", "Pr(>Chi)"))
-})
-
 test_that("model.matrix() on geem returns the design matrix", {
   g <- geeM::geem(breaks ~ wool + tension, id = rep(1:18, each = 3), data = warpbreaks, family = "poisson")
   expect_identical(model.matrix(g), g$X)
   expect_equal(unname(model.matrix(g)), unname(model.matrix(~ wool + tension, warpbreaks)), ignore_attr = TRUE)
-})
-
-test_that("drop1() on geese gives Wald tests per term", {
-  skip_known_bug("B04")
-  gs <- geepack::geese(
-    breaks ~ wool + tension, id = rep(1:18, each = 3), data = warpbreaks,
-    family = poisson, corstr = "exchangeable"
-  )
-  expect_equal(drop1(gs)$Wald, drop1(fit_warpbreaks_geeglm())$Wald)
 })

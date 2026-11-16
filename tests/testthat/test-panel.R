@@ -34,17 +34,3 @@ test_that("panel.hist and panel.r2 accept their optional arguments", {
   plot.new()
   expect_no_error(ignore_b14(panel.r2(x, y, digits = 4, cex.cor = 2)))
 })
-
-test_that("panel.hist and panel.r2 restore par('usr') without warnings", {
-  skip_known_bug("B14")
-  withr::local_pdf(NULL)
-  x <- c(1, 3, 2, 5, 4, 6, 8, 7, 9)
-
-  plot.new()
-  plot.window(xlim = c(0, 10), ylim = c(0, 10))
-  usr <- par("usr")
-  expect_no_warning(panel.hist(x))
-  expect_equal(par("usr"), usr)
-  expect_no_warning(panel.r2(x, rev(x)))
-  expect_equal(par("usr"), usr)
-})

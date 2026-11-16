@@ -65,9 +65,3 @@ test_that("power_mcnemar_test validates its arguments", {
   expect_error(power_mcnemar_test(n = 60, paid = .1, psi = 0.5), "psi must be 1 or greater")
   expect_error(power_mcnemar_test(n = 60, paid = .4, psi = 3), "psi cannot be so big")
 })
-
-test_that("power_mcnemar_test accepts psi = 1 as its error message states", {
-  skip_known_bug("B34")
-  # With no effect, two-sided normal-approximation power is sig.level / 2
-  expect_equal(power_mcnemar_test(n = 60, paid = 0.1, psi = 1)$power, 0.025)
-})

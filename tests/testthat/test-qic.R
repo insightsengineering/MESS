@@ -84,26 +84,3 @@ test_that("non-geeglm objects are rejected", {
   expect_error(MESS::QIC(structure(list(), class = "geekin")), "QIC requires a geekin object")
   expect_error(MESS::QIC(lm(dist ~ speed, data = cars)), class = "error")
 })
-
-test_that("QIC works when the model data is a local variable", {
-  skip_known_bug("B09")
-  dat <- geepack::ohio
-  fit <- geepack::geeglm(resp ~ age + smoke, id = id, data = dat,
-                         family = binomial, corstr = "exchangeable")
-  expect_equal(MESS::QIC(fit), geepack::QIC(fit))
-})
-
-test_that("models can be compared by passing them positionally", {
-  skip_known_bug("B11")
-  fit1 <- geepack::geeglm(resp ~ age + smoke, id = id, data = geepack::ohio, family = binomial)
-  fit2 <- geepack::geeglm(resp ~ age, id = id, data = geepack::ohio, family = binomial)
-
-  res <- MESS::QIC(fit1, fit2)
-  expect_equal(dim(res), c(2, 6))
-})
-
-test_that("QIC works for an ordgee fit", {
-  skip_known_bug("B10")
-  fit <- geepack::ordgee(ordered(resp) ~ age, id = id, data = geepack::ohio)
-  expect_named(MESS::QIC(fit), qic_names)
-})

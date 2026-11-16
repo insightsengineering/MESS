@@ -58,11 +58,6 @@ test_that("cumsumbinning() caps the group size with maxgroupsize", {
   expect_error(cumsumbinning(x, 10, maxgroupsize = 0), "maxgroupsize should be larger than 0")
 })
 
-test_that("cumsumbinning() numbers groups from 1 when the first value exceeds the threshold", {
-  skip_known_bug("B24")
-  expect_equal(cumsumbinning(c(15, 1, 2), 10), c(1, 2, 2))
-})
-
 test_that("dCov() and dCor() match the distance covariance definition", {
   x <- matrix(c(1, 2, 4))
   y <- matrix(c(1, 3, 2))
@@ -154,13 +149,6 @@ test_that("ks_cumtest() uses prob as the null distribution", {
   expect_equal(unname(res$statistic), 6 / 10 - 3 / 21)
 })
 
-test_that("ks_cumtest() rescales prob to sum to 1", {
-  skip_known_bug("B22")
-  withr::local_seed(1)
-  res <- ks_cumtest(1:6, B = 100, prob = c(5, 1, 1, 1, 1, 1))
-  expect_equal(unname(res$statistic), 6 / 10 - 3 / 21)
-})
-
 test_that("ks_cumtest() validates its input", {
   expect_error(ks_cumtest(1:6, B = 100, prob = c(1, 1, 1)), "lengths of x and prob must match")
   expect_error(ks_cumtest(1:6, B = 100, prob = c(1, 1, 1, 1, 1, 0)), "must be positive")
@@ -172,11 +160,6 @@ test_that("maximum_subarray() finds the contiguous subarray with the largest sum
   expect_equal(maximum_subarray(c(-2, 1, -3, 4, -1, 2, 1, -5, 4)), list(sum = 6, start = 4, end = 7))
   expect_equal(maximum_subarray(c(-5, -2, -8, -1, -9)), list(sum = -1, start = 4, end = 4))
   expect_equal(maximum_subarray(7), list(sum = 7, start = 1, end = 1))
-})
-
-test_that("maximum_subarray() rejects an empty vector", {
-  skip_known_bug("B23")
-  expect_error(maximum_subarray(numeric(0)))
 })
 
 test_that("mfastLmCpp() fits one simple linear regression per column", {

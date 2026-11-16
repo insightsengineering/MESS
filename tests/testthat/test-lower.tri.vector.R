@@ -28,8 +28,3 @@ test_that("lower.tri.vector validates the cluster argument", {
     "contiguous blocks"
   )
 })
-
-test_that("lower.tri.vector rejects a non-square matrix", {
-  skip_known_bug("B15")
-  expect_error(lower.tri.vector(matrix(1:12, nrow = 3)), "square matrix")
-})

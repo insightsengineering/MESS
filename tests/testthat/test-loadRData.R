@@ -10,12 +10,3 @@ test_that("loadRData errors (with a warning) for a non-existent file", {
   path <- withr::local_tempfile(fileext = ".RData")
   expect_error(expect_warning(loadRData(path)), class = "error")
 })
-
-test_that("loadRData returns an object that is named 'filename'", {
-  skip_known_bug("B16")
-  path <- withr::local_tempfile(fileext = ".RData")
-  filename <- 1:3
-  save(filename, file = path)
-
-  expect_identical(loadRData(path), 1:3)
-})

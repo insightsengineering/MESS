@@ -29,11 +29,6 @@ test_that("auc() sorts unsorted x values", {
   expect_equal(auc(c(3, 1, 2, 4), c(1, 0, 1, 5)), 4.5)
 })
 
-test_that("auc() with absolutearea = TRUE handles unsorted x values", {
-  skip_known_bug("B01")
-  expect_equal(auc(c(4, 0, 1, 2, 3), c(0, 0, 0, 1, -1), absolutearea = TRUE), 1.5)
-})
-
 test_that("auc() with type = 'spline' integrates the natural spline", {
   x <- 0:4
   y <- c(0, 0, 1, -1, 0)

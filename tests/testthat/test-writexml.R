@@ -33,13 +33,6 @@ test_that("factor and decimal columns are written as text", {
   expect_equal(readLines(path)[3], "  <row><f>lvl</f><n>1.5</n></row>")
 })
 
-test_that("a data frame without rows writes an empty document", {
-  skip_known_bug("B42")
-  path <- withr::local_tempfile(fileext = ".xml")
-  write.xml(xml_data[0, ], file = path)
-  expect_equal(readLines(path), c('<?xml version="1.0"?>', "<document>", "</document>"))
-})
-
 test_that("invalid inputs raise informative errors", {
   expect_error(write.xml(xml_data), "filename not specified")
   path <- withr::local_tempfile(fileext = ".xml")

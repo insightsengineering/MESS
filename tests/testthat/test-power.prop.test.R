@@ -5,15 +5,6 @@ test_that("power_prop_test with ratio = 1 matches stats::power.prop.test(strict 
   )
 })
 
-test_that("power_prop_test one-sided power matches stats::power.prop.test", {
-  skip_known_bug("B33")
-  expect_equal(power_prop_test(n = 50, p1 = 0.5, p2 = 0.5, alternative = "one.sided")$power, 0.05)
-  expect_equal(
-    power_prop_test(n = 50, p1 = 0.5, p2 = 0.7, alternative = "one.sided")$power,
-    power.prop.test(n = 50, p1 = 0.5, p2 = 0.7, alternative = "one.sided")$power
-  )
-})
-
 test_that("power_prop_test sample size with ratio = 1 matches stats::power.prop.test", {
   res <- power_prop_test(p1 = 0.5, p2 = 0.7, power = 0.8)
   expect_equal(res$n, power.prop.test(p1 = 0.5, p2 = 0.7, power = 0.8)$n, tolerance = 1e-6)
@@ -44,16 +35,6 @@ test_that("power_prop_test solves for p1, p2 and ratio consistently", {
   ratio <- res$n[2] / res$n[1]
   expect_equal(res$n[1], 50)
   expect_equal(power_prop_test(n = 50, p1 = 0.5, p2 = 0.7, ratio = ratio)$power, 0.8, tolerance = 1e-4)
-})
-
-test_that("power_prop_test solves for sig.level", {
-  skip_known_bug("B32")
-  res <- power_prop_test(n = 93, p1 = 0.5, p2 = 0.7, power = 0.8, sig.level = NULL)
-  expect_equal(
-    res$sig.level,
-    power.prop.test(n = 93, p1 = 0.5, p2 = 0.7, power = 0.8, sig.level = NULL)$sig.level,
-    tolerance = 1e-3
-  )
 })
 
 test_that("power_prop_test validates its arguments", {

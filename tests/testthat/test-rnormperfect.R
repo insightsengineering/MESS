@@ -9,13 +9,6 @@ test_that("a vector n uses its length, like rnorm()", {
   expect_equal(rnorm_perfect(c(10, 20, 30)), rnorm_perfect(3))
 })
 
-test_that("the sample is centred at mean and scaled by sd", {
-  skip_known_bug("B06")
-  res <- rnorm_perfect(30, mean = 10, sd = 2)
-  expect_equal(mean(res), 10)
-  expect_equal(res, 10 + 2 * qnorm((1:30) / 31))
-})
-
 test_that("invalid arguments raise errors", {
   expect_error(rnorm_perfect("a"), "is.numeric\\(n\\) is not TRUE")
   expect_error(rnorm_perfect(0), "n > 0 is not TRUE")

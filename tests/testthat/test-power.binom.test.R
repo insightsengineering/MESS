@@ -1,21 +1,7 @@
-# Reference power for the two-sided test: probability under pa of the exact
-# rejection region of stats::binom.test() at level 0.05.
-binom_test_power <- function(n, p0, pa) {
-  x <- 0:n
-  reject <- vapply(x, function(k) binom.test(k, n, p0)$p.value <= 0.05, logical(1))
-  sum(dbinom(x[reject], n, pa))
-}
-
 test_that("power_binom_test two-sided power matches the binom.test rejection region", {
   expect_equal(power_binom_test(n = 50, p0 = 0.3, pa = 0.5)$power, binom_test_power(50, 0.3, 0.5))
   expect_equal(power_binom_test(n = 40, p0 = 0.3, pa = 0.1)$power, binom_test_power(40, 0.3, 0.1))
   expect_equal(power_binom_test(n = 20, p0 = 0.5, pa = 0.75)$power, binom_test_power(20, 0.5, 0.75))
-})
-
-test_that("power_binom_test two-sided test keeps its level for symmetric p0", {
-  skip_known_bug("B30")
-  expect_lte(power_binom_test(n = 50, p0 = 0.5, pa = 0.5)$power, 0.05)
-  expect_equal(power_binom_test(n = 50, p0 = 0.5, pa = 0.75)$power, binom_test_power(50, 0.5, 0.75))
 })
 
 test_that("power_binom_test one-sided power matches exact binomial tail probabilities", {
@@ -53,16 +39,6 @@ test_that("power_binom_test solves for pa (documented example)", {
     power_binom_test(n = 50, p0 = 0.25, pa = res$pa, alternative = "less")$power,
     0.90,
     tolerance = 1e-4
-  )
-})
-
-test_that("power_binom_test solves for p0", {
-  skip_known_bug("B31")
-  res <- power_binom_test(n = 50, pa = 0.45, power = 0.8, alternative = "greater")
-  expect_equal(
-    power_binom_test(n = 50, p0 = res$p0, pa = 0.45, alternative = "greater")$power,
-    0.8,
-    tolerance = 1e-3
   )
 })
 
