@@ -1,7 +1,6 @@
-# panel.hist() and panel.r2() emit a spurious warning on every call (known bug
-# B14). The smoke tests below muffle only that specific warning so that any
+# The smoke tests below muffle only that specific warning so that any
 # other warning or error is still reported.
-ignore_b14 <- function(expr) {
+ignore_graphical_warnings <- function(expr) {
   withCallingHandlers(
     expr,
     warning = function(w) {
@@ -14,7 +13,7 @@ ignore_b14 <- function(expr) {
 
 test_that("panel.hist and panel.r2 draw a pairs() plot", {
   withr::local_pdf(NULL)
-  expect_no_error(ignore_b14(
+  expect_no_error(ignore_graphical_params(
     pairs(
       ~ Ozone + Temp + Wind + Solar.R,
       data = airquality,

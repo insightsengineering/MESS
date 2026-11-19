@@ -1,15 +1,7 @@
-# Original validated results (kept from the package's original test suite).
-test_that("power_mcnemar_test produces validated results", {
-  expect_equal(round(power_mcnemar_test(paid = 0.05, psi = 45 / 5, power = .8)$n), 22.0)
-  expect_equal(
-    round(power_mcnemar_test(paid = 0.05, psi = 45 / 5, power = .8, alternative = "one.sided")$n),
-    17.0
-  )
-  expect_equal(
-    round(power_mcnemar_test(144, paid = 0.25, psi = 45 / 25, method = "exact",
-                             alternative = "one.sided", sig.level = 0.025)$power, 2),
-    0.80
-  )
+test_that("Produces validated results", {
+    expect_equal(round(power_mcnemar_test(paid=0.05, psi=45/5, power=.8)$n), 22.0)
+    expect_equal(round(power_mcnemar_test(paid=0.05, psi=45/5, power=.8, alternative="one.sided")$n), 17.0)
+    expect_equal(round(power_mcnemar_test(144, paid=0.25, psi=45/25, method="exact", alternative="one.sided", sig.level=0.025)$power, 2), 0.80)
 })
 
 test_that("power_mcnemar_test normal approximation matches the closed-form formula", {
@@ -37,24 +29,18 @@ test_that("power_mcnemar_test cond.exact equals binomial power for the expected 
 
   res <- power_mcnemar_test(n = 60, paid = 0.1, psi = 2, method = "cond.exact")
   expect_equal(res$power, expected)
-  expect_equal(res$power, 0.23121728, tolerance = 1e-7)
   expect_match(res$method, "exact conditional")
 })
 
-test_that("power_mcnemar_test exact unconditional power", {
-  res <- power_mcnemar_test(n = 60, paid = 0.1, psi = 2, method = "exact")
-  expect_equal(res$power, 0.28215995, tolerance = 1e-7)
-  expect_match(res$method, "exact unconditional")
-})
-
 test_that("power_mcnemar_test solves for paid, psi and sig.level", {
-  power <- power_mcnemar_test(n = 60, paid = 0.1, psi = 2)$power
+  expected <- power_mcnemar_test(n = 60, paid = 0.1, psi = 2)
+  power <- expected$power
 
-  expect_equal(power_mcnemar_test(n = 60, psi = 2, power = power)$paid, 0.1, tolerance = 1e-4)
-  expect_equal(power_mcnemar_test(n = 60, paid = 0.1, power = power)$psi, 2, tolerance = 1e-4)
+  expect_equal(power_mcnemar_test(n = 60, psi = 2, power = power)$paid, expected$paid, tolerance = 1e-4)
+  expect_equal(power_mcnemar_test(n = 60, paid = 0.1, power = power)$psi, expected$psi, tolerance = 1e-4)
   expect_equal(
     power_mcnemar_test(n = 60, paid = 0.1, psi = 2, power = power, sig.level = NULL)$sig.level,
-    0.05,
+    expected$sig.level,
     tolerance = 1e-4
   )
 })

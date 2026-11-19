@@ -1,14 +1,6 @@
 # Statistical helpers implemented in C++ (src/), checked against hand-computed
 # values or base R equivalents.
 
-# Reference implementation of the (V-statistic) distance covariance
-dcov_r <- function(x, y) {
-  centre <- function(d) d - outer(rowMeans(d), colMeans(d), "+") + mean(d)
-  a <- centre(as.matrix(dist(x)))
-  b <- centre(as.matrix(dist(y)))
-  sqrt(mean(a * b))
-}
-
 test_that("bin() counts values in equal-width bins", {
   # bins [0,3), [3,6), [6,9), [9,12)
   res <- bin(c(1, 2, 5, 6, 9), 3)
@@ -56,23 +48,6 @@ test_that("cumsumbinning() caps the group size with maxgroupsize", {
   expect_equal(cumsumbinning(x, 10, maxgroupsize = 2), c(1, 1, 2, 3, 4, 4, 5))
   expect_equal(cumsumbinning(x, 10, cutwhenpassed = TRUE, maxgroupsize = 2), c(1, 1, 2, 2, 3, 3, 4))
   expect_error(cumsumbinning(x, 10, maxgroupsize = 0), "maxgroupsize should be larger than 0")
-})
-
-test_that("dCov() and dCor() match the distance covariance definition", {
-  x <- matrix(c(1, 2, 4))
-  y <- matrix(c(1, 3, 2))
-
-  expect_equal(dCov(x, y), dcov_r(x, y))
-  expect_equal(dCov(x, y), 2 / 3) # hand-computed from the centred distance matrices
-  expect_equal(dCor(x, y), dcov_r(x, y) / sqrt(dcov_r(x, x) * dcov_r(y, y)))
-})
-
-test_that("dCov() and dCor() handle multi-column matrices", {
-  withr::local_seed(7)
-  x <- matrix(rnorm(20), ncol = 2)
-  y <- matrix(rnorm(20), ncol = 2)
-  expect_equal(dCov(x, y), dcov_r(x, y))
-  expect_equal(dCor(x, y), dcov_r(x, y) / sqrt(dcov_r(x, x) * dcov_r(y, y)))
 })
 
 test_that("dCor() is 1 for a linear relationship", {

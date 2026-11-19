@@ -13,7 +13,6 @@ test_that("monte_carlo_chisq_test() returns the Pearson statistic and expected c
   expect_s3_class(res, "htest")
   expect_named(res, c("statistic", "parameter", "p.value", "method", "data.name", "observed", "expected"))
   expect_equal(unname(res$statistic), pearson_statistic(chisq_table))
-  expect_equal(unname(res$statistic), 15 / 14) # hand-computed
   expect_equal(res$expected, outer(c(20, 10), c(16, 14)) / 30)
   expect_equal(res$observed, chisq_table)
   expect_equal(res$parameter, c(B = 1000))

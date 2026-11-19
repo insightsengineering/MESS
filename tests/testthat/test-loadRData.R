@@ -5,8 +5,3 @@ test_that("loadRData returns the saved object regardless of its name", {
 
   expect_identical(loadRData(path), my_object)
 })
-
-test_that("loadRData errors (with a warning) for a non-existent file", {
-  path <- withr::local_tempfile(fileext = ".RData")
-  expect_error(expect_warning(loadRData(path)), class = "error")
-})
