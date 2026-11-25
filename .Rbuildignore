@@ -16,3 +16,4 @@
 ^\.travis\.yml$
 ^\.git
 ^docs$
+^\.github$
