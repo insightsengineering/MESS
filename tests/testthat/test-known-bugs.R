@@ -5,12 +5,6 @@ skip("Known bugs documented in this file")
 # test back to the test file for that function (the section headers below).
 # See tests/testthat/KNOWN_BUGS.md for details on each defect.
 
-# test-auc.R ------------------------------------------------------------------
-
-test_that("auc() with absolutearea = TRUE handles unsorted x values", {
-    expect_equal(auc(c(4, 0, 1, 2, 3), c(0, 0, 0, 1, -1), absolutearea = TRUE), 1.5)
-})
-
 # test-drop1.geeglm.R ---------------------------------------------------------
 
 test_that("drop1() score tests work when the data is a local variable", {

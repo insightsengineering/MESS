@@ -24,3 +24,9 @@ test_that("auc() returns NA for a single x value", {
   expect_identical(auc(2, 1), NA)
 })
 
+test_that("auc() with absolutearea = TRUE handles unsorted x values", {
+  expect_equal(
+    auc(c(4, 0, 1, 2, 3), c(0, 0, 0, 1, -1), absolutearea = TRUE),
+    auc(c(0, 1, 2, 3), c(0, 1, -1, 0), absolutearea = TRUE)
+  )
+})

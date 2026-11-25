@@ -13,7 +13,7 @@ ignore_graphical_warnings <- function(expr) {
 
 test_that("panel.hist and panel.r2 draw a pairs() plot", {
   withr::local_pdf(NULL)
-  expect_no_error(ignore_graphical_params(
+  expect_no_error(ignore_graphical_warnings(
     pairs(
       ~ Ozone + Temp + Wind + Solar.R,
       data = airquality,
@@ -29,7 +29,7 @@ test_that("panel.hist and panel.r2 accept their optional arguments", {
   y <- c(2, 1, 4, 3, 6, 5, 8, 7, 10, 9)
 
   plot.new()
-  expect_no_error(ignore_b14(panel.hist(x, col.bar = "red", col = "blue")))
+  expect_no_error(ignore_graphical_warnings(panel.hist(x, col.bar = "red", col = "blue")))
   plot.new()
-  expect_no_error(ignore_b14(panel.r2(x, y, digits = 4, cex.cor = 2)))
+  expect_no_error(ignore_graphical_warnings(panel.r2(x, y, digits = 4, cex.cor = 2)))
 })
