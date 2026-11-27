@@ -38,5 +38,5 @@ BugReports: https://github.com/ekstroem/MESS/issues
 Encoding: UTF-8
 ByteCompile: true
 License: GPL-2
-RoxygenNote: 7.3.3
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.1
