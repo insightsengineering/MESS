@@ -19,6 +19,11 @@ Useful links:
 \author{
 \strong{Maintainer}: Claus Thorn Ekstrøm \email{claus@rprimer.dk}
 
+Authors:
+\itemize{
+  \item Claus Thorn Ekstrøm \email{claus@rprimer.dk}
+}
+
 Other contributors:
 \itemize{
   \item Niels Aske Lundtorp Olsen \email{nalo@dtu.dk} [contributor]

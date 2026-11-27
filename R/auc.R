@@ -65,6 +65,11 @@ function(x, y, from = min(x, na.rm=TRUE), to = max(x, na.rm=TRUE), type=c("linea
     if (length(unique(x)) < 2)
         return(NA)
 
+    # sort X
+    o <- order(x)
+    x <- x[o]
+    y <- y[o]
+
     if (type=="linear") {
 
         ## Default option
@@ -85,23 +90,23 @@ function(x, y, from = min(x, na.rm=TRUE), to = max(x, na.rm=TRUE), type=c("linea
             # Get the order of the first occurrence of unique values in sorted x
             # This works because the new points are added to the end of the vector
             unique_order <- order(match(sort(unique(newx)), newx))
-      
+
             # Get the unique sorted x values
             x_sorted_unique <- sort(unique(newx))
-      
+
             # Match the sorted unique x values to their first occurrence in x
             match_indices <- match(x_sorted_unique, newx)
-      
+
             # Reorder y accordingly
             y_sorted <- newy[match_indices]
-       
+
             newx <- x_sorted_unique
             newy <- y_sorted
 
             values <- approx(newx, newy, xout = sort(unique(c(from, to, newx[newx > from & newx < to]))), ...)
             res <- 0.5 * sum(diff(values$x) * (abs(values$y[-1]) + abs(values$y[-length(values$y)])))
         }
-        
+
     } else { ## If it is not a linear approximation
         if (absolutearea)
             myfunction <- function(z) { abs(splinefun(x, y, method="natural")(z)) }

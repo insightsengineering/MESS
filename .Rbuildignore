@@ -1,3 +1,5 @@
+^renv$
+^renv\.lock$
 ^\.RData
 ^\.Rhistory
 ^README*
@@ -14,3 +16,4 @@
 ^\.travis\.yml$
 ^\.git
 ^docs$
+^\.github$
