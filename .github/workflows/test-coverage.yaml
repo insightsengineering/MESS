@@ -41,12 +41,23 @@ jobs:
           print(cov)
           covr::to_cobertura(cov)
           covr::report(cov, file = "coverage-report.html", browse = FALSE)
+          saveRDS(cov, file.path(Sys.getenv("RUNNER_TEMP"), "coverage.rds"))
+        shell: Rscript {0}
 
-          # Per-file coverage table in the job summary
+      - name: Print coverage for package and files
+        run: |
+          cov <- readRDS(file.path(Sys.getenv("RUNNER_TEMP"), "coverage.rds"))
           pct <- covr::percent_coverage(cov)
           files <- covr::tally_coverage(cov, by = "line")
           by_file <- aggregate(value ~ filename, data = files, FUN = function(v) mean(v > 0) * 100)
           by_file <- by_file[order(by_file$value), ]
+
+          # Print to the job log
+          cat(sprintf("Package coverage: %.2f%%\n\n", pct))
+          width <- max(nchar(by_file$filename))
+          cat(sprintf("%-*s %8.2f%%\n", width, by_file$filename, by_file$value), sep = "")
+
+          # Same table in the job summary
           lines <- c(
             sprintf("## Test coverage: %.2f%%", pct),
             "",

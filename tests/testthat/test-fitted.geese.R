@@ -13,3 +13,19 @@ test_that("fitted.geese returns fitted values for a gaussian geese fit", {
 
   expect_equal(as.vector(fitted(fit)), as.vector(fitted(ref)))
 })
+
+test_that("fitted.geese returns fitted values for a default geese fit", {
+  dat <- make_gee_data()
+  fit <- geepack::geese(x1 ~ age, id = id, data = dat, corstr = "exchangeable")
+  ref <- geepack::geeglm(x1 ~ age, id = id, data = dat, corstr = "exchangeable")
+
+  expect_equal(as.vector(fitted(fit)), as.vector(fitted(ref)))
+})
+
+test_that("fitted.geese returns fitted values for a default geese fit", {
+  dat <- make_gee_data()
+  fit <- geepack::geese(x1 ~ age, id = id, data = dat, corstr = "exchangeable")
+  ref <- geepack::geeglm(x1 ~ age, id = id, data = dat, corstr = "exchangeable")
+
+  expect_equal(as.vector(fitted(fit)), as.vector(fitted(ref)))
+})

@@ -8,23 +8,23 @@ skip("Known bugs documented in this file")
 # test-drop1.geeglm.R ---------------------------------------------------------
 
 test_that("drop1() score tests work when the data is a local variable", {
-    local_data <- warpbreaks
-    fit <- geepack::geeglm(breaks ~ wool + tension, id = rep(1:18, each = 3), data = local_data, family = poisson)
-    expect_named(drop1(fit, test = "score"), c("DF", "Score", "Pr(>Chi)"))
+  local_data <- warpbreaks
+  fit <- geepack::geeglm(breaks ~ wool + tension, id = rep(1:18, each = 3), data = local_data, family = poisson)
+  expect_named(drop1(fit, test = "score"), c("DF", "Score", "Pr(>Chi)"))
 })
 
 test_that("drop1() on geeglm with test = 'none' keeps the statistic", {
-    out <- drop1(fit_warpbreaks_geeglm(), test = "none")
+  out <- drop1(fit_warpbreaks_geeglm(), test = "none")
   expect_named(out, c("DF", "Wald"))
 })
 
 test_that("drop1() on geem computes score tests", {
-    g <- geeM::geem(breaks ~ wool + tension, id = rep(1:18, each = 3), data = warpbreaks, family = "poisson")
+  g <- geeM::geem(breaks ~ wool + tension, id = rep(1:18, each = 3), data = warpbreaks, family = "poisson")
   expect_named(drop1(g, test = "score"), c("DF", "Score", "Pr(>Chi)"))
 })
 
 test_that("drop1() on geese gives Wald tests per term", {
-    gs <- geepack::geese(
+  gs <- geepack::geese(
     breaks ~ wool + tension, id = rep(1:18, each = 3), data = warpbreaks,
     family = poisson, corstr = "exchangeable"
   )
@@ -34,12 +34,12 @@ test_that("drop1() on geese gives Wald tests per term", {
 # test-extended.shared.R ------------------------------------------------------
 
 test_that("extended.shared() handles a pedigree with a single non-founder", {
-    trio <- kinship2::pedigree(1:3, c(0, 0, 1), c(0, 0, 2), c(1, 2, 1))
+  trio <- kinship2::pedigree(1:3, c(0, 0, 1), c(0, 0, 2), c(1, 2, 1))
   expect_equal(extended.shared(trio), nuclear_expected(1, 1)[1:3, 1:3])
 })
 
 test_that("extended.shared() passes rho and theta on for a pedigreeList", {
-    result <- extended.shared(make_two_families(), rho = 0.5, theta = 0.5)
+  result <- extended.shared(make_two_families(), rho = 0.5, theta = 0.5)
   expect_equal(as.matrix(result)[1:4, 1:4], nuclear_expected(0.5, 0.5), ignore_attr = TRUE)
 })
 
